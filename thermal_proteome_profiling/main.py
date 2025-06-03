@@ -102,7 +102,7 @@ def combine_samples(data_df: pd.DataFrame) -> pd.DataFrame:
     for ind, row in data_df.iterrows():
         dmso_R = mean(
             [
-                *row[data_df.filter(like="E01").columns].values,
+                *row[data_df.filter(like="A01").columns].values,
                 *row[data_df.filter(like="F01").columns].values,
                 *row[data_df.filter(like="G01").columns].values,
                 *row[data_df.filter(like="H01").columns].values,
@@ -110,7 +110,7 @@ def combine_samples(data_df: pd.DataFrame) -> pd.DataFrame:
         )
         dmso_S = mean(
             [
-                *row[data_df.filter(like="E07").columns].values,
+                *row[data_df.filter(like="A07").columns].values,
                 *row[data_df.filter(like="F07").columns].values,
                 *row[data_df.filter(like="G07").columns].values,
                 *row[data_df.filter(like="H07").columns].values,
@@ -124,44 +124,46 @@ def combine_samples(data_df: pd.DataFrame) -> pd.DataFrame:
                 "variant": "R",
                 "0.1": mean(
                     [
-                        *row[data_df.filter(like="E02").columns].values,
-                        *row[data_df.filter(like="F02").columns].values,
-                        *row[data_df.filter(like="G02").columns].values,
-                        *row[data_df.filter(like="H02").columns].values,
+                        *row[data_df.filter(like="A02").columns].values,
+                        *row[data_df.filter(like="B02").columns].values,
+                        *row[data_df.filter(like="C02").columns].values,
+                        *row[data_df.filter(like="D02").columns].values,
                     ]
                 )
                 - dmso_R,
                 "0.3": mean(
                     [
-                        *row[data_df.filter(like="E03").columns].values,
-                        *row[data_df.filter(like="G03").columns].values,
-                        *row[data_df.filter(like="H03").columns].values,
+                        *row[data_df.filter(like="A03").columns].values,
+                        *row[data_df.filter(like="B03").columns].values,
+                        *row[data_df.filter(like="C03").columns].values,
+                        *row[data_df.filter(like="D03").columns].values,
                     ]
                 )
                 - dmso_R,
                 "1": mean(
                     [
-                        *row[data_df.filter(like="E04").columns].values,
-                        *row[data_df.filter(like="F04").columns].values,
-                        *row[data_df.filter(like="G04").columns].values,
-                        *row[data_df.filter(like="H04").columns].values,
+                        *row[data_df.filter(like="A04").columns].values,
+                        *row[data_df.filter(like="B04").columns].values,
+                        *row[data_df.filter(like="C04").columns].values,
+                        *row[data_df.filter(like="D04").columns].values,
                     ]
                 )
                 - dmso_R,
                 "3": mean(
                     [
-                        *row[data_df.filter(like="F05").columns].values,
-                        *row[data_df.filter(like="G05").columns].values,
-                        *row[data_df.filter(like="H05").columns].values,
+                        *row[data_df.filter(like="A05").columns].values,
+                        *row[data_df.filter(like="B05").columns].values,
+                        *row[data_df.filter(like="C05").columns].values,
+                        *row[data_df.filter(like="D05").columns].values,
                     ]
                 )
                 - dmso_R,
                 "10": mean(
                     [
-                        *row[data_df.filter(like="E06").columns].values,
-                        *row[data_df.filter(like="F06").columns].values,
-                        *row[data_df.filter(like="G06").columns].values,
-                        *row[data_df.filter(like="H06").columns].values,
+                        *row[data_df.filter(like="A06").columns].values,
+                        *row[data_df.filter(like="B06").columns].values,
+                        *row[data_df.filter(like="C06").columns].values,
+                        *row[data_df.filter(like="D06").columns].values,
                     ]
                 )
                 - dmso_R,
@@ -175,46 +177,46 @@ def combine_samples(data_df: pd.DataFrame) -> pd.DataFrame:
                 "variant": "S",
                 "0.1": mean(
                     [
-                        *row[data_df.filter(like="E08").columns].values,
-                        *row[data_df.filter(like="F08").columns].values,
-                        *row[data_df.filter(like="G08").columns].values,
-                        *row[data_df.filter(like="H08").columns].values,
+                        *row[data_df.filter(like="A08").columns].values,
+                        *row[data_df.filter(like="B08").columns].values,
+                        *row[data_df.filter(like="C08").columns].values,
+                        *row[data_df.filter(like="D08").columns].values,
                     ]
                 )
                 - dmso_S,
                 "0.3": mean(
                     [
-                        *row[data_df.filter(like="E09").columns].values,
-                        *row[data_df.filter(like="F09").columns].values,
-                        *row[data_df.filter(like="G09").columns].values,
-                        *row[data_df.filter(like="H09").columns].values,
+                        *row[data_df.filter(like="A09").columns].values,
+                        *row[data_df.filter(like="B09").columns].values,
+                        *row[data_df.filter(like="C09").columns].values,
+                        *row[data_df.filter(like="D09").columns].values,
                     ]
                 )
                 - dmso_S,
                 "1": mean(
                     [
-                        *row[data_df.filter(like="E10").columns].values,
-                        *row[data_df.filter(like="F10").columns].values,
-                        *row[data_df.filter(like="G10").columns].values,
-                        *row[data_df.filter(like="H10").columns].values,
+                        *row[data_df.filter(like="A10").columns].values,
+                        *row[data_df.filter(like="B10").columns].values,
+                        *row[data_df.filter(like="C10").columns].values,
+                        *row[data_df.filter(like="D10").columns].values,
                     ]
                 )
                 - dmso_S,
                 "3": mean(
                     [
-                        *row[data_df.filter(like="E11").columns].values,
-                        *row[data_df.filter(like="F11").columns].values,
-                        *row[data_df.filter(like="G11").columns].values,
-                        *row[data_df.filter(like="H11").columns].values,
+                        *row[data_df.filter(like="A11").columns].values,
+                        *row[data_df.filter(like="B11").columns].values,
+                        *row[data_df.filter(like="C11").columns].values,
+                        *row[data_df.filter(like="D11").columns].values,
                     ]
                 )
                 - dmso_S,
                 "10": mean(
                     [
-                        *row[data_df.filter(like="E12").columns].values,
-                        *row[data_df.filter(like="F12").columns].values,
-                        *row[data_df.filter(like="G12").columns].values,
-                        *row[data_df.filter(like="H12").columns].values,
+                        *row[data_df.filter(like="A12").columns].values,
+                        *row[data_df.filter(like="B12").columns].values,
+                        *row[data_df.filter(like="C12").columns].values,
+                        *row[data_df.filter(like="D12").columns].values,
                     ]
                 )
                 - dmso_S,
