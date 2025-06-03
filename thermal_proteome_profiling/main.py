@@ -61,6 +61,25 @@ parser.add_argument(
     help="Path to the output folder (must exist).",
 )
 
+# Add this after your existing parser arguments, before the functions
+mode_group = parser.add_mutually_exclusive_group()
+
+mode_group.add_argument("-g", "--gene", type=str, help="Plot a single gene by name")
+
+mode_group.add_argument(
+    "-gl",
+    "--gene-list",
+    type=check_filepath,
+    help="Path to a text file containing gene names (one per line)",
+)
+
+
+def read_gene_list(file_path: Path) -> list:
+    """Read gene names from a text file, one per line"""
+    with open(file_path, "r") as f:
+        genes = [line.strip() for line in f if line.strip()]
+    return genes
+
 
 # read in the data file
 def read_data(path: Path) -> pd.DataFrame:
@@ -277,7 +296,7 @@ def filter_by_area_between_curves(R_df, S_df, threshold=300):
     return filtered_R_df, filtered_S_df
 
 
-def plot_r_s_lines(gene_name, R_df, S_df):
+def plot_r_s_lines(gene_name, R_df, S_df, output_dir):
     """
     Create a single seaborn-styled plot for one gene showing R and S variant response curves.
 
@@ -364,14 +383,17 @@ def plot_r_s_lines(gene_name, R_df, S_df):
     plt.legend(frameon=True, fancybox=True, shadow=True)
 
     plt.tight_layout()
-    plt.savefig(f"outputs/{gene_name}.png")
+    plt.savefig(f"{output_dir}/{gene_name}.png")
+    plt.close()
 
 
-def plot_all_filtered(filtered_R, filtered_S):
+def plot_all_filtered(filtered_R, filtered_S, output_dir):
     R_genes = set(filtered_R["PG.Genes"].unique())
 
-    for gene_name in R_genes:
-        plot_r_s_lines(gene_name, filtered_R, filtered_S)
+    print(f"Plotting {len(R_genes)} genes...")
+    for i, gene_name in enumerate(R_genes, 1):
+        print(f"Plotting {i}/{len(R_genes)}: {gene_name}")
+        plot_r_s_lines(gene_name, filtered_R, filtered_S, output_dir)
 
 
 def main():
@@ -384,14 +406,37 @@ def main():
     # output folder
     out_dir = args.output_folder
 
-    # covert data file to dataframe
+    # convert data file to dataframe
     data_df = read_data(data)
-
     s, r = combine_samples(data_df)
 
-    filter_by_area_between_curves(r, s)
+    # Mode 1: Single gene plotting
+    if args.gene:
+        print(f"Plotting single gene: {args.gene}")
+        plot_r_s_lines(args.gene, r, s, out_dir)
 
-    plot_all_filtered(r, s)
+    # Mode 2: Gene list plotting
+    elif args.gene_list:
+        gene_list = read_gene_list(args.gene_list)
+        print(f"Plotting {len(gene_list)} genes from list...")
+
+        available_genes = set(r["PG.Genes"].unique())
+        found_genes = [gene for gene in gene_list if gene in available_genes]
+        missing_genes = [gene for gene in gene_list if gene not in available_genes]
+
+        print(f"Found {len(found_genes)} genes, {len(missing_genes)} missing")
+        if missing_genes:
+            print(f"Missing genes: {missing_genes[:5]}...")  # Show first 5
+
+        for i, gene_name in enumerate(found_genes, 1):
+            print(f"Plotting {i}/{len(found_genes)}: {gene_name}")
+            plot_r_s_lines(gene_name, r, s, out_dir)
+
+    # Mode 3: Filter and plot all (default behavior)
+    else:
+        print("Applying filter and plotting all passing genes...")
+        filter_r, filter_s = filter_by_area_between_curves(r, s)
+        plot_all_filtered(filter_r, filter_s, out_dir)
 
 
 if __name__ == "__main__":
