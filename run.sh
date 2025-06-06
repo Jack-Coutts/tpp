@@ -4,7 +4,7 @@ echo "Running thermal proteome profiling script...."
 # poetry run python3 thermal_proteome_profiling/main.py -d data/3965_U2OS_spectronaut_Report.csv -o outputs/U2OS_filtered/
 
 # single gene mode
-poetry run python3 thermal_proteome_profiling/main.py -d data/3965_U2OS_spectronaut_candidates.tsv -o outputs/ -g NOL6
+# poetry run python3 thermal_proteome_profiling/main.py -d data/3965_U2OS_spectronaut_candidates.tsv -o outputs/ -g NOL6
 
 # gene list mode
-# poetry run python3 thermal_proteome_profiling/main.py -d data/3965_U2OS_spectronaut_Report.csv -o outputs/U2OS_gene_list/ -gl data/gene_list.txt
+poetry run python3 thermal_proteome_profiling/main.py -d data/3965_U2OS_spectronaut_candidates.tsv -o outputs/ -gl data/gene_list.txt

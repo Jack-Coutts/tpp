@@ -137,7 +137,7 @@ def single_gene_tpp_plot(
         )
         variant_df = gene_data[var_mask]
 
-        for concentration in concentrations:
+        for concentration in sorted_concentrations:
             log_fld_change = variant_df.loc[
                 variant_df["Comparison (group1/group2)"].str.contains(
                     concentration, na=False
@@ -271,24 +271,28 @@ def main():
         print(f"Plotting single gene: {args.gene}")
         single_gene_tpp_plot(args.gene, data_df, out_dir, y_max, y_min)
 
-    """
     # Mode 2: Gene list plotting
     elif args.gene_list:
         gene_list = read_gene_list(args.gene_list)
         print(f"Plotting {len(gene_list)} genes from list...")
 
-        available_genes = set(r["PG.Genes"].unique())
+        available_genes = set(data_df["Genes"].unique())
         found_genes = [gene for gene in gene_list if gene in available_genes]
         missing_genes = [gene for gene in gene_list if gene not in available_genes]
-
         print(f"Found {len(found_genes)} genes, {len(missing_genes)} missing")
+
+        filtered_df = data_df[data_df["Genes"].isin(found_genes)]
+        y_max = filtered_df["AVG Log2 Ratio"].max()
+        y_min = filtered_df["AVG Log2 Ratio"].min()
+
         if missing_genes:
             print(f"Missing genes: {missing_genes[:5]}...")  # Show first 5
 
         for i, gene_name in enumerate(found_genes, 1):
             print(f"Plotting {i}/{len(found_genes)}: {gene_name}")
-            plot_r_s_lines(gene_name, r, s, out_dir)
+            single_gene_tpp_plot(gene_name, data_df, out_dir, y_max, y_min)
 
+    """
     # Mode 3: Filter and plot all (default behavior)
     else:
         print("Applying filter and plotting all passing genes...")
