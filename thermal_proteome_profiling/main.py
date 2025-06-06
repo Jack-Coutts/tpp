@@ -1,6 +1,6 @@
 import argparse
 from pathlib import Path
-from statistics import mean
+from typing import Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -82,154 +82,100 @@ def read_gene_list(file_path: Path) -> list:
 
 
 # read in the data file
-def read_data(path: Path) -> pd.DataFrame:
-    data_df = pd.read_csv(path)
+def read_data(path: Path) -> Tuple[pd.DataFrame, float, float]:
+    data_df = pd.read_csv(path, delimiter="\t")
 
-    filtered_df = data_df[
-        data_df["PG.NrOfStrippedSequencesIdentified (Experiment-wide)"] >= 2
-    ]
+    filtered_df = data_df[data_df["# Unique Total Peptides"] >= 2]
+    highest_fld_chng = filtered_df["AVG Log2 Ratio"].max()
+    lowest_fld_chng = filtered_df["AVG Log2 Ratio"].min()
+    print(f"low: {lowest_fld_chng}, high: {highest_fld_chng}")
 
-    return filtered_df
+    return filtered_df, highest_fld_chng, lowest_fld_chng
 
 
-# group concentrations and protein variants
-def combine_samples(data_df: pd.DataFrame) -> pd.DataFrame:
-    # plot data
-    plot_data_R = []
-    plot_data_S = []
+def single_gene_tpp_plot(
+    gene_name, data_df, output_dir, highest_y_value, lowest_y_value
+):
+    # Set seaborn style
+    sns.set_style("whitegrid")
+    plt.rcParams["font.size"] = 11
 
-    # iterate over the rows - manually specifying columns due to inconsistencies
-    for ind, row in data_df.iterrows():
-        dmso_R = mean(
-            [
-                *row[data_df.filter(like="A01").columns].values,
-                *row[data_df.filter(like="F01").columns].values,
-                *row[data_df.filter(like="G01").columns].values,
-                *row[data_df.filter(like="H01").columns].values,
-            ]
+    # Filter data for the specific gene
+    gene_data = data_df[data_df["Genes"] == gene_name]
+
+    # check gene data exists
+    if gene_data.empty:
+        print(f"No data found for gene: {gene_name}")
+        return None
+
+    # cell line name
+    cell_line = gene_data["Comparison (group1/group2)"].iloc[0].split("_")[0]
+
+    # protein variants
+    variants = gene_data["Comparison (group1/group2)"].str.split("_").str[1].unique()
+
+    # concentrations
+    concentrations = (
+        gene_data["Comparison (group1/group2)"]
+        .str.split("_")
+        .str[2]  # get the third element of each split
+        .str.split(" ")
+        .str[0]  # get the part before the first space
+        .unique()  # get unique values
+    )
+
+    sorted_concentrations = sorted(concentrations, key=lambda x: float(x.rstrip("uM")))
+
+    # create dictionary containing each line to be plotted
+    lines = {}
+
+    # create the line for each variant
+    for variant in variants:
+        lines[variant] = []
+        var_mask = (
+            gene_data["Comparison (group1/group2)"].str.split("_").str[1] == variant
         )
-        dmso_S = mean(
-            [
-                *row[data_df.filter(like="A07").columns].values,
-                *row[data_df.filter(like="F07").columns].values,
-                *row[data_df.filter(like="G07").columns].values,
-                *row[data_df.filter(like="H07").columns].values,
-            ]
-        )
+        variant_df = gene_data[var_mask]
 
-        plot_data_R.append(
-            {
-                "PG.Genes": row["PG.Genes"],
-                "PG.UniProtIds": row["PG.UniProtIds"],
-                "variant": "R",
-                "0.1": mean(
-                    [
-                        *row[data_df.filter(like="A02").columns].values,
-                        *row[data_df.filter(like="B02").columns].values,
-                        *row[data_df.filter(like="C02").columns].values,
-                        *row[data_df.filter(like="D02").columns].values,
-                    ]
-                )
-                - dmso_R,
-                "0.3": mean(
-                    [
-                        *row[data_df.filter(like="A03").columns].values,
-                        *row[data_df.filter(like="B03").columns].values,
-                        *row[data_df.filter(like="C03").columns].values,
-                        *row[data_df.filter(like="D03").columns].values,
-                    ]
-                )
-                - dmso_R,
-                "1": mean(
-                    [
-                        *row[data_df.filter(like="A04").columns].values,
-                        *row[data_df.filter(like="B04").columns].values,
-                        *row[data_df.filter(like="C04").columns].values,
-                        *row[data_df.filter(like="D04").columns].values,
-                    ]
-                )
-                - dmso_R,
-                "3": mean(
-                    [
-                        *row[data_df.filter(like="A05").columns].values,
-                        *row[data_df.filter(like="B05").columns].values,
-                        *row[data_df.filter(like="C05").columns].values,
-                        *row[data_df.filter(like="D05").columns].values,
-                    ]
-                )
-                - dmso_R,
-                "10": mean(
-                    [
-                        *row[data_df.filter(like="A06").columns].values,
-                        *row[data_df.filter(like="B06").columns].values,
-                        *row[data_df.filter(like="C06").columns].values,
-                        *row[data_df.filter(like="D06").columns].values,
-                    ]
-                )
-                - dmso_R,
-            }
-        )
+        for concentration in concentrations:
+            log_fld_change = variant_df.loc[
+                variant_df["Comparison (group1/group2)"].str.contains(
+                    concentration, na=False
+                ),
+                "AVG Log2 Ratio",
+            ].iloc[0]
+            lines[variant].append(log_fld_change)
 
-        plot_data_S.append(
-            {
-                "PG.Genes": row["PG.Genes"],
-                "PG.UniProtIds": row["PG.UniProtIds"],
-                "variant": "S",
-                "0.1": mean(
-                    [
-                        *row[data_df.filter(like="A08").columns].values,
-                        *row[data_df.filter(like="B08").columns].values,
-                        *row[data_df.filter(like="C08").columns].values,
-                        *row[data_df.filter(like="D08").columns].values,
-                    ]
-                )
-                - dmso_S,
-                "0.3": mean(
-                    [
-                        *row[data_df.filter(like="A09").columns].values,
-                        *row[data_df.filter(like="B09").columns].values,
-                        *row[data_df.filter(like="C09").columns].values,
-                        *row[data_df.filter(like="D09").columns].values,
-                    ]
-                )
-                - dmso_S,
-                "1": mean(
-                    [
-                        *row[data_df.filter(like="A10").columns].values,
-                        *row[data_df.filter(like="B10").columns].values,
-                        *row[data_df.filter(like="C10").columns].values,
-                        *row[data_df.filter(like="D10").columns].values,
-                    ]
-                )
-                - dmso_S,
-                "3": mean(
-                    [
-                        *row[data_df.filter(like="A11").columns].values,
-                        *row[data_df.filter(like="B11").columns].values,
-                        *row[data_df.filter(like="C11").columns].values,
-                        *row[data_df.filter(like="D11").columns].values,
-                    ]
-                )
-                - dmso_S,
-                "10": mean(
-                    [
-                        *row[data_df.filter(like="A12").columns].values,
-                        *row[data_df.filter(like="B12").columns].values,
-                        *row[data_df.filter(like="C12").columns].values,
-                        *row[data_df.filter(like="D12").columns].values,
-                    ]
-                )
-                - dmso_S,
-            }
-        )
+    plot_df = pd.DataFrame(lines, index=concentrations).reset_index()
+    plot_df = plot_df.melt(
+        id_vars="index", var_name="variant", value_name="log_fld_change"
+    )
+    plot_df.rename(columns={"index": "concentration"}, inplace=True)
 
-    R_df = pd.DataFrame(plot_data_R)
-    S_df = pd.DataFrame(plot_data_S)
+    sns.lineplot(
+        data=plot_df,
+        x="concentration",  # categorical, equally spaced
+        y="log_fld_change",
+        hue="variant",  # separate lines per variant
+        marker="o",
+        linewidth=2,
+        markersize=6,
+    )
 
-    return R_df, S_df
+    plt.ylim(lowest_y_value, highest_y_value)
+    plt.xlabel("Concentration", fontsize=12)
+    plt.ylabel("AVG Log2 Ratio", fontsize=12)
+    plt.title(f"{cell_line} {gene_name}", fontsize=14, fontweight="bold", pad=20)
+    # Add horizontal line at y=0
+    plt.axhline(y=0, color="gray", linewidth=0.8, alpha=0.7)
+    # Legend styling
+    plt.legend(frameon=True, fancybox=True, shadow=True)
+    plt.tight_layout()
+    plt.savefig(f"{output_dir}/{gene_name}_{cell_line}.png")
+    plt.close()
 
 
-def filter_by_area_between_curves(R_df, S_df, threshold=300):
+def filter_by_area_between_curves(R_df, S_df, threshold=0.3):
     """
     Filter genes based on area between R and S curves and return filtered DataFrames
 
@@ -298,97 +244,6 @@ def filter_by_area_between_curves(R_df, S_df, threshold=300):
     return filtered_R_df, filtered_S_df
 
 
-def plot_r_s_lines(gene_name, R_df, S_df, output_dir):
-    """
-    Create a single seaborn-styled plot for one gene showing R and S variant response curves.
-
-    Parameters:
-    gene_name (str): The gene name to plot
-    R_df (pd.DataFrame): DataFrame containing R variant data
-    S_df (pd.DataFrame): DataFrame containing S variant data
-    """
-
-    # Set seaborn style
-    sns.set_style("whitegrid")
-    plt.rcParams["font.size"] = 11
-
-    # Filter data for the specific gene
-    R_gene = R_df[R_df["PG.Genes"] == gene_name]
-    S_gene = S_df[S_df["PG.Genes"] == gene_name]
-
-    if R_gene.empty and S_gene.empty:
-        print(f"No data found for gene: {gene_name}")
-        return None
-
-    # Extract concentration columns
-    concentration_columns = [
-        col
-        for col in R_df.columns
-        if col not in ["PG.Genes", "PG.UniProtIds", "variant"]
-    ]
-    concentrations = sorted(concentration_columns, key=lambda x: float(x))
-
-    # Create equally spaced x positions (0, 1, 2, 3, 4, etc.)
-    x_positions = list(range(len(concentrations)))
-
-    # Create concentration labels
-    conc_labels = [f"{conc}uM" for conc in concentrations]
-
-    # Create the plot
-    plt.figure(figsize=(8, 6))
-
-    # Plot R variant (blue line)
-    if not R_gene.empty:
-        R_values = R_gene[concentrations].iloc[0].values
-        plt.plot(
-            x_positions,
-            R_values,
-            color="#4472C4",
-            marker="o",
-            linewidth=2,
-            markersize=6,
-            label="R",
-        )
-
-    # Plot S variant (red/orange line)
-    if not S_gene.empty:
-        S_values = S_gene[concentrations].iloc[0].values
-        plt.plot(
-            x_positions,
-            S_values,
-            color="#E15759",
-            marker="o",
-            linewidth=2,
-            markersize=6,
-            label="S",
-        )
-
-    # Formatting to match the reference image
-    plt.title(gene_name, fontsize=14, fontweight="bold", pad=20)
-
-    # Let y-axis limits be automatic based on data
-
-    # Set x-axis ticks and labels with equal spacing
-    plt.xticks(x_positions, conc_labels)
-
-    # Add horizontal line at y=0
-    plt.axhline(y=0, color="gray", linewidth=0.8, alpha=0.7)
-
-    # Grid styling
-    plt.grid(True, alpha=0.3, linewidth=0.5)
-
-    # Labels
-    plt.xlabel("Concentration", fontsize=12)
-    # plt.ylabel("Response Value", fontsize=12)
-
-    # Legend
-    plt.legend(frameon=True, fancybox=True, shadow=True)
-
-    plt.tight_layout()
-    plt.savefig(f"{output_dir}/{gene_name}.png")
-    plt.close()
-
-
 def plot_all_filtered(filtered_R, filtered_S, output_dir):
     R_genes = set(filtered_R["PG.Genes"].unique())
 
@@ -409,14 +264,14 @@ def main():
     out_dir = args.output_folder
 
     # convert data file to dataframe
-    data_df = read_data(data)
-    s, r = combine_samples(data_df)
+    data_df, y_max, y_min = read_data(data)
 
     # Mode 1: Single gene plotting
     if args.gene:
         print(f"Plotting single gene: {args.gene}")
-        plot_r_s_lines(args.gene, r, s, out_dir)
+        single_gene_tpp_plot(args.gene, data_df, out_dir, y_max, y_min)
 
+    """
     # Mode 2: Gene list plotting
     elif args.gene_list:
         gene_list = read_gene_list(args.gene_list)
@@ -439,6 +294,7 @@ def main():
         print("Applying filter and plotting all passing genes...")
         filter_r, filter_s = filter_by_area_between_curves(r, s)
         plot_all_filtered(filter_r, filter_s, out_dir)
+    """
 
 
 if __name__ == "__main__":
