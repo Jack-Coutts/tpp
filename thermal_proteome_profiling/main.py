@@ -20,6 +20,7 @@ logging.basicConfig(
 # checks if the given path exists and is a file. Returns a Path object.
 def check_filepath(filepath_str: str) -> Path:
     path = Path(filepath_str)
+    3
     if not path.exists():
         raise argparse.ArgumentTypeError(
             f"Error: The path '{filepath_str}' does not exist."
@@ -115,17 +116,23 @@ def read_data(path: Path) -> Tuple[pd.DataFrame, float, float]:
         logging.error(f"{e}")
 
 
-def plotter(df, y_min, y_max, cell_line, gene_name, output_dir):
+def plotter(df, y_min, y_max, cell_line, gene_name, output_dir, variants):
     try:
         # Set seaborn style
         sns.set_style("whitegrid")
         plt.rcParams["font.size"] = 11
+
+        # ensure line colour consistency
+        sorted_variants = sorted(variants, key=lambda x: x[0])
+        variant_palette = {sorted_variants[0]: "#1f77b4", sorted_variants[1]: "#d62728"}
 
         sns.lineplot(
             data=df,
             x="concentration",  # categorical, equally spaced
             y="log_fld_change",
             hue="variant",  # separate lines per variant
+            palette=variant_palette,
+            hue_order=[sorted_variants[0], sorted_variants[1]],
             marker="o",
             linewidth=2,
             markersize=6,
@@ -224,7 +231,13 @@ def filter_or_plot_gene(
 
     else:
         plotter(
-            plot_df, lowest_y_value, highest_y_value, cell_line, gene_name, output_dir
+            plot_df,
+            lowest_y_value,
+            highest_y_value,
+            cell_line,
+            gene_name,
+            output_dir,
+            variants,
         )
 
 
