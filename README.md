@@ -38,7 +38,7 @@ HSP90AA1    K562_S_5uM  4   0.28
 
 The `EXAMPLE.png` file shows what the output TPP plots look like:
 
-![Example TPP plot](./Example.png)
+![Example TPP plot](./EXAMPLE.png)
 
 ## Configuration
 
