@@ -1,4 +1,5 @@
 import argparse
+import logging
 from pathlib import Path
 from typing import Tuple
 
@@ -6,6 +7,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+
+# Configure logging to stdout with basic settings
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler()],
+)
 
 
 # custom type converter for argparse using pathlib
@@ -73,54 +81,75 @@ mode_group.add_argument(
     help="Path to a text file containing gene names (one per line)",
 )
 
+mode_group.add_argument(
+    "-f",
+    "--filter",
+    action="store_true",
+    help="Filter proteins and add to a gene_list file.",
+)
+
 
 def read_gene_list(file_path: Path) -> list:
     """Read gene names from a text file, one per line"""
-    with open(file_path, "r") as f:
-        genes = [line.strip() for line in f if line.strip()]
-    return genes
+    try:
+        with open(file_path, "r") as f:
+            genes = [line.strip() for line in f if line.strip()]
+        logging.info(f"{len(genes)} genes read from gene list")
+        return genes
+    except Exception as e:
+        logging.error(f"Error reading {Path}:")
+        logging.error(f"{e}")
 
 
 # read in the data file
 def read_data(path: Path) -> Tuple[pd.DataFrame, float, float]:
-    data_df = pd.read_csv(path, delimiter="\t")
-
-    filtered_df = data_df[data_df["# Unique Total Peptides"] >= 2]
-    highest_fld_chng = filtered_df["AVG Log2 Ratio"].max()
-    lowest_fld_chng = filtered_df["AVG Log2 Ratio"].min()
-
-    return filtered_df, highest_fld_chng, lowest_fld_chng
+    try:
+        data_df = pd.read_csv(path, delimiter="\t")
+        filtered_df = data_df[data_df["# Unique Total Peptides"] >= 2]
+        highest_fld_chng = filtered_df["AVG Log2 Ratio"].max()
+        lowest_fld_chng = filtered_df["AVG Log2 Ratio"].min()
+        logging.info(f"{Path} read success")
+        return filtered_df, highest_fld_chng, lowest_fld_chng
+    except Exception as e:
+        logging.error(f"Error reading {Path}:")
+        logging.error(f"{e}")
 
 
 def plotter(df, y_min, y_max, cell_line, gene_name, output_dir):
-    # Set seaborn style
-    sns.set_style("whitegrid")
-    plt.rcParams["font.size"] = 11
+    try:
+        # Set seaborn style
+        sns.set_style("whitegrid")
+        plt.rcParams["font.size"] = 11
 
-    sns.lineplot(
-        data=df,
-        x="concentration",  # categorical, equally spaced
-        y="log_fld_change",
-        hue="variant",  # separate lines per variant
-        marker="o",
-        linewidth=2,
-        markersize=6,
-    )
+        sns.lineplot(
+            data=df,
+            x="concentration",  # categorical, equally spaced
+            y="log_fld_change",
+            hue="variant",  # separate lines per variant
+            marker="o",
+            linewidth=2,
+            markersize=6,
+        )
 
-    plt.ylim(y_min, y_max)
-    plt.xlabel("Concentration", fontsize=12)
-    plt.ylabel("AVG Log2 Ratio", fontsize=12)
-    plt.title(f"{cell_line} {gene_name}", fontsize=14, fontweight="bold", pad=20)
-    # Add horizontal line at y=0
-    plt.axhline(y=0, color="gray", linewidth=0.8, alpha=0.7)
-    # Legend styling
-    plt.legend(frameon=True, fancybox=True, shadow=True)
-    plt.tight_layout()
-    plt.savefig(f"{output_dir}/{gene_name}_{cell_line}.png")
-    plt.close()
+        plt.ylim(y_min, y_max)
+        plt.xlabel("Concentration", fontsize=12)
+        plt.ylabel("AVG Log2 Ratio", fontsize=12)
+        plt.title(f"{cell_line} {gene_name}", fontsize=14, fontweight="bold", pad=20)
+        # Add horizontal line at y=0
+        plt.axhline(y=0, color="gray", linewidth=0.8, alpha=0.7)
+        # Legend styling
+        plt.legend(frameon=True, fancybox=True, shadow=True)
+        plt.tight_layout()
+        plt.savefig(f"{output_dir}/{gene_name}_{cell_line}.png")
+        plt.close()
+        logging.info(f"{gene_name} from {cell_line} plotted")
+
+    except Exception as e:
+        logging.error(f"Error plotting {gene_name} from {cell_line}:")
+        logging.error(f"{e}")
 
 
-def single_gene_tpp_plot(
+def filter_or_plot_gene(
     gene_name,
     data_df,
     output_dir,
@@ -184,27 +213,25 @@ def single_gene_tpp_plot(
     # filter
     if filter:
         if filter_proteins(lines, sorted_concentrations, variants, flat=filter_flat):
-            plotter(
-                plot_df,
-                lowest_y_value,
-                highest_y_value,
-                cell_line,
-                gene_name,
-                output_dir,
-            )
-            print(f"{gene_name}: passed filter & plotted.")
+            logging.info(f"{gene_name} from {cell_line} passed filtering")
+            with open("data/gene_list_from_filtering.txt", "a") as f:
+                # Only add a newline if the file is not empty
+                if f.tell() != 0:
+                    f.write("\n")
+                f.write(gene_name)
         else:
-            print(f"{gene_name}: removed by filter.")
+            logging.info(f"{gene_name} from {cell_line} was removed in filtering")
 
     else:
         plotter(
             plot_df, lowest_y_value, highest_y_value, cell_line, gene_name, output_dir
         )
-        print(f"{gene_name}: plotted.")
 
 
-def filter_proteins(line_dictionary, concentrations, variants, threshold=3, flat=False):
+def filter_proteins(line_dictionary, concentrations, variants, threshold=2, flat=False):
     # NOTE: Concentrations are treated as categorical data to equally weight each concentration change
+    logging.info("filtering started")
+    logging.info(f"Area between curves threshold: {threshold}")
 
     # Convert to arrays
     y1 = np.array(line_dictionary[variants[0]])
@@ -217,8 +244,13 @@ def filter_proteins(line_dictionary, concentrations, variants, threshold=3, flat
 
     if flat:
         # Check that control curve is flat
-        flatness_threshold = 0.3
-        ctrl_curve = np.array(line_dictionary["R"])  # change R as needed
+        flatness_threshold = 0.35
+        logging.info(
+            f"Standard deviation/Control curve flatness threshold: {flatness_threshold}"
+        )
+        control_curve_name = "R"
+        logging.info(f"control curve name: {control_curve_name}")
+        ctrl_curve = np.array(line_dictionary[control_curve_name])  # change R as needed
         std_dev = np.std(ctrl_curve)
         is_flat = std_dev < flatness_threshold
 
@@ -245,36 +277,44 @@ def main():
 
     # Mode 1: Single gene plotting
     if args.gene:
-        print(f"Plotting single gene: {args.gene}")
-        single_gene_tpp_plot(args.gene, data_df, out_dir, y_max, y_min)
+        logging.info(f"Plotting single gene: {args.gene}")
+        filter_or_plot_gene(args.gene, data_df, out_dir, y_max, y_min)
 
     # Mode 2: Gene list plotting
     elif args.gene_list:
         gene_list = read_gene_list(args.gene_list)
-        print(f"Plotting {len(gene_list)} genes from list...")
-
         available_genes = set(data_df["Genes"].unique())
+        logging.info(f"plotting {len(available_genes)} genes from list...")
         found_genes = [gene for gene in gene_list if gene in available_genes]
         missing_genes = [gene for gene in gene_list if gene not in available_genes]
-        print(f"Found {len(found_genes)} genes, {len(missing_genes)} missing")
+        logging.info(f"Found {len(found_genes)} genes, {len(missing_genes)} missing")
 
         filtered_df = data_df[data_df["Genes"].isin(found_genes)]
         y_max = filtered_df["AVG Log2 Ratio"].max()
         y_min = filtered_df["AVG Log2 Ratio"].min()
 
         if missing_genes:
-            print(f"Missing genes: {missing_genes[:5]}...")  # Show first 5
+            logging.info(f"Missing genes: {missing_genes[:5]}...")  # Show first 5
 
         for i, gene_name in enumerate(found_genes, 1):
-            print(f"Plotting {i}/{len(found_genes)}: {gene_name}")
-            single_gene_tpp_plot(gene_name, data_df, out_dir, y_max, y_min)
+            logging.info(f"Plotting {i}/{len(found_genes)}: {gene_name}")
+            filter_or_plot_gene(gene_name, data_df, out_dir, y_max, y_min)
 
-    # Mode 3: Filter and plot all (default behavior)
-    else:
-        genes = data_df["Genes"]
-        print("Applying filter and plotting all passing genes...")
+    # Mode 3: Filter proteins and create a gene list of filtered
+    elif args.filter:
+        genes = data_df["Genes"].unique()
+        logging.info("Applying filter and adding genes to gene list...")
         for i, gene_name in enumerate(genes, 1):
-            single_gene_tpp_plot(gene_name, data_df, out_dir, y_max, y_min, True, True)
+            logging.info(f"protein {i}/{len(genes)}")
+            filter_or_plot_gene(gene_name, data_df, out_dir, y_max, y_min, True, True)
+
+    # Mode 4: Plot all proteins
+    else:
+        genes = data_df["Genes"].unique()
+        logging.info("Plotting all genes...")
+        for i, gene_name in enumerate(genes, 1):
+            logging.info(f"protein {i}/{len(genes)}")
+            filter_or_plot_gene(gene_name, data_df, out_dir, y_max, y_min)
 
 
 if __name__ == "__main__":
