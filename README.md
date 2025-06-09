@@ -36,6 +36,10 @@ HSP90AA1    K562_S_5uM  4   0.28
 - **Plots**: `{GENE_NAME}_{CELL_LINE}.png` - Individual melt curve plots
 - **Filter Results**: `data/gene_list_from_filtering.txt` - Genes passing filter criteria
 
+The `EXAMPLE.png` file shows what the output TPP plots look like:
+
+![Example TPP plot](./Example.png)
+
 ## Configuration
 
 ### Filtering Parameters
