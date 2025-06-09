@@ -1,10 +1,22 @@
-echo "Running thermal proteome profiling script...."
+for file in data/*; do
 
-# filtering all mode
-# poetry run python3 thermal_proteome_profiling/main.py -d data/3965_U2OS_spectronaut_Report.csv -o outputs/U2OS_filtered/
+    # skip the gene list file
+    [ "$file" = "data/gene_list.txt" ] && continue
 
-# single gene mode
-# poetry run python3 thermal_proteome_profiling/main.py -d data/3965_U2OS_spectronaut_candidates.tsv -o outputs/ -g NOL6
+    echo "Running thermal proteome profiling script on $file ...."
 
-# gene list mode
-poetry run python3 thermal_proteome_profiling/main.py -d data/3965_U2OS_spectronaut_candidates.tsv -o outputs/ -gl data/gene_list.txt
+    # single gene mode
+    # poetry run python3 thermal_proteome_profiling/main.py -d $file -o outputs/ -g NOL6
+
+    # gene list mode
+    # poetry run python3 thermal_proteome_profiling/main.py -d $file -o outputs/gene_list -gl data/gene_list.txt
+
+    # filtering all mode
+    poetry run python3 thermal_proteome_profiling/main.py -d $file -o outputs/filtered/
+
+done
+
+
+
+
+
