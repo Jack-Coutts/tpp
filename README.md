@@ -19,14 +19,15 @@ The input must be a tab-delimited file with these required columns:
 | `Comparison (group1/group2)` | Cell line, variant, concentration | `K562_R_10uM` |
 | `# Unique Total Peptides` | Peptide count (≥2 required) | `4` |
 | `AVG Log2 Ratio` | Log2 fold change value | `-0.125` |
+| `Standard Error` | Standard error for error bars (optional) | `0.045` |
 
 **Example Data:**
 ```
-Genes   Comparison (group1/group2)  # Unique Total Peptides AVG Log2 Ratio
-HSP90AA1    K562_R_10uM 4   -0.12
-HSP90AA1    K562_S_10uM 4   0.32
-HSP90AA1    K562_R_5uM  4   -0.15
-HSP90AA1    K562_S_5uM  4   0.28
+Genes   Comparison (group1/group2)  # Unique Total Peptides AVG Log2 Ratio  Standard Error
+HSP90AA1    K562_R_10uM 4   -0.12   0.045
+HSP90AA1    K562_S_10uM 4   0.32    0.038
+HSP90AA1    K562_R_5uM  4   -0.15   0.042
+HSP90AA1    K562_S_5uM  4   0.28    0.035
 ```
 
 ## Output
@@ -155,6 +156,9 @@ poetry run python3 thermal_proteome_profiling/main.py -d <data_file> -o <output_
 - `-f, --filter`: Filter proteins and create gene list file named `gene_list_from_filtering.txt`
 - *(no mode)*: Plot all proteins
 
+**Additional Options:**
+- `-e, --error-bars`: Add error bars to plots (requires `Standard Error` column in data)
+
 ### Example Workflows
 
 **Single Gene Analysis:**
@@ -162,9 +166,19 @@ poetry run python3 thermal_proteome_profiling/main.py -d <data_file> -o <output_
 poetry run python thermal_proteome_profiling/main.py -d data/tpp_results.tsv -o plots/ -g HSP90AA1
 ```
 
+**Single Gene Analysis with Error Bars:**
+```bash
+poetry run python thermal_proteome_profiling/main.py -d data/tpp_results.tsv -o plots/ -g HSP90AA1 -e
+```
+
 **Batch Processing from Gene List:**
 ```bash
 poetry run python thermal_proteome_profiling/main.py -d data/tpp_results.tsv -o outputs/ -gl data/gene_list.txt
+```
+
+**Batch Processing with Error Bars:**
+```bash
+poetry run python thermal_proteome_profiling/main.py -d data/tpp_results.tsv -o outputs/ -gl data/gene_list.txt -e
 ```
 
 **Protein Filtering:**
