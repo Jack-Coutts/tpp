@@ -20,7 +20,6 @@ logging.basicConfig(
 # checks if the given path exists and is a file. Returns a Path object.
 def check_filepath(filepath_str: str) -> Path:
     path = Path(filepath_str)
-    3
     if not path.exists():
         raise argparse.ArgumentTypeError(
             f"Error: The path '{filepath_str}' does not exist."
@@ -69,6 +68,12 @@ parser.add_argument(
     type=check_directory,
     help="Path to the output folder (must exist).",
 )
+parser.add_argument(
+    "-e",
+    "--error-bars",
+    action="store_true",
+    help="Add error bars to gene list plots.",
+)
 
 # Add this after your existing parser arguments, before the functions
 mode_group = parser.add_mutually_exclusive_group()
@@ -116,15 +121,27 @@ def read_data(path: Path) -> Tuple[pd.DataFrame, float, float]:
         logging.error(f"{e}")
 
 
-def plotter(df, y_min, y_max, cell_line, gene_name, output_dir, variants):
+def plotter(
+    df, y_min, y_max, cell_line, gene_name, output_dir, variants, error_df=None
+):
     try:
         # Set seaborn style
         sns.set_style("whitegrid")
         plt.rcParams["font.size"] = 11
 
         # ensure line colour consistency
-        sorted_variants = sorted(variants, key=lambda x: x[0])
-        variant_palette = {sorted_variants[0]: "#1f77b4", sorted_variants[1]: "#d62728"}
+        try:
+            sorted_variants = sorted(variants, key=lambda x: x[0])
+            variant_palette = {
+                sorted_variants[0]: "#1f77b4",
+                sorted_variants[1]: "#d62728",
+            }
+            logging.info(f"Sorted variants exist: {sorted_variants}")
+        except Exception as e:
+            logging.error(
+                f"Less than 2 protein varainats exist: Variants: {variants}\n Error: {e}"
+            )
+            return
 
         sns.lineplot(
             data=df,
@@ -138,6 +155,32 @@ def plotter(df, y_min, y_max, cell_line, gene_name, output_dir, variants):
             markersize=6,
         )
 
+        # Add error bars if error_df is provided
+        if error_df is not None:
+            ax = plt.gca()
+            unique_concentrations = df["concentration"].unique()
+            concentration_to_x = {
+                conc: i for i, conc in enumerate(unique_concentrations)
+            }
+
+            for variant in sorted_variants:
+                variant_data = df[df["variant"] == variant]
+                error_data = error_df[error_df["variant"] == variant]
+                x_positions = [
+                    concentration_to_x[conc] for conc in variant_data["concentration"]
+                ]
+
+                ax.errorbar(
+                    x=x_positions,
+                    y=variant_data["log_fld_change"],
+                    yerr=error_data["Standard Error"],
+                    fmt="none",
+                    color=variant_palette[variant],
+                    capsize=4,
+                    capthick=1.5,
+                    alpha=0.8,
+                )
+
         plt.ylim(y_min, y_max)
         plt.xlabel("Concentration", fontsize=12)
         plt.ylabel("AVG Log2 Ratio", fontsize=12)
@@ -147,13 +190,49 @@ def plotter(df, y_min, y_max, cell_line, gene_name, output_dir, variants):
         # Legend styling
         plt.legend(frameon=True, fancybox=True, shadow=True)
         plt.tight_layout()
-        plt.savefig(f"{output_dir}/{gene_name}_{cell_line}.png")
+        plt.savefig(
+            f"{output_dir}/{gene_name}_{cell_line}.png", dpi=300, bbox_inches="tight"
+        )
         plt.close()
         logging.info(f"{gene_name} from {cell_line} plotted")
 
     except Exception as e:
         logging.error(f"Error plotting {gene_name} from {cell_line}:")
         logging.error(f"{e}")
+
+
+def get_lines(variants, gene_data, sorted_concentrations, in_column, out_column):
+    # check column exists
+    if in_column not in gene_data.columns:
+        raise ValueError(f"Column {in_column} not found in dataset")
+
+    lines = {}
+    for variant in variants:
+        lines[variant] = []
+        var_mask = (
+            gene_data["Comparison (group1/group2)"].str.split("_").str[1] == variant
+        )
+        variant_df = gene_data[var_mask]
+
+        for concentration in sorted_concentrations:
+            try:
+                column_value = variant_df.loc[
+                    variant_df["Comparison (group1/group2)"].str.contains(
+                        concentration, na=False
+                    ),
+                    in_column,
+                ].iloc[0]
+                lines[variant].append(column_value)
+            except Exception as e:
+                logging.error(f"Error getting line for {variant} at {concentration}:")
+                logging.error(f"{e}")
+                lines[variant].append(None)
+
+    plot_df = pd.DataFrame(lines, index=sorted_concentrations).reset_index()
+    plot_df = plot_df.melt(id_vars="index", var_name="variant", value_name=out_column)
+    plot_df.rename(columns={"index": "concentration"}, inplace=True)
+
+    return plot_df, lines
 
 
 def filter_or_plot_gene(
@@ -164,6 +243,7 @@ def filter_or_plot_gene(
     lowest_y_value,
     filter=False,
     filter_flat=False,
+    error_bars=False,
 ):
     # Filter data for the specific gene
     gene_data = data_df[data_df["Genes"] == gene_name]
@@ -191,31 +271,20 @@ def filter_or_plot_gene(
 
     sorted_concentrations = sorted(concentrations, key=lambda x: float(x.rstrip("uM")))
 
-    # create dictionary containing each line to be plotted
-    lines = {}
-
-    # create the line for each variant
-    for variant in variants:
-        lines[variant] = []
-        var_mask = (
-            gene_data["Comparison (group1/group2)"].str.split("_").str[1] == variant
-        )
-        variant_df = gene_data[var_mask]
-
-        for concentration in sorted_concentrations:
-            log_fld_change = variant_df.loc[
-                variant_df["Comparison (group1/group2)"].str.contains(
-                    concentration, na=False
-                ),
-                "AVG Log2 Ratio",
-            ].iloc[0]
-            lines[variant].append(log_fld_change)
-
-    plot_df = pd.DataFrame(lines, index=sorted_concentrations).reset_index()
-    plot_df = plot_df.melt(
-        id_vars="index", var_name="variant", value_name="log_fld_change"
+    # Create line df
+    plot_df, lines = get_lines(
+        variants, gene_data, sorted_concentrations, "AVG Log2 Ratio", "log_fld_change"
     )
-    plot_df.rename(columns={"index": "concentration"}, inplace=True)
+
+    error_df = None
+    if error_bars:
+        error_df, error_lines = get_lines(
+            variants,
+            gene_data,
+            sorted_concentrations,
+            "Standard Error",
+            "Standard Error",
+        )
 
     # filter
     if filter:
@@ -238,6 +307,7 @@ def filter_or_plot_gene(
             gene_name,
             output_dir,
             variants,
+            error_df,
         )
 
 
@@ -285,13 +355,18 @@ def main():
     # output folder
     out_dir = args.output_folder
 
+    # error bars
+    error_bars = args.error_bars
+
     # convert data file to dataframe
     data_df, y_max, y_min = read_data(data)
 
     # Mode 1: Single gene plotting
     if args.gene:
         logging.info(f"Plotting single gene: {args.gene}")
-        filter_or_plot_gene(args.gene, data_df, out_dir, y_max, y_min)
+        filter_or_plot_gene(
+            args.gene, data_df, out_dir, y_max, y_min, error_bars=error_bars
+        )
 
     # Mode 2: Gene list plotting
     elif args.gene_list:
@@ -311,7 +386,9 @@ def main():
 
         for i, gene_name in enumerate(found_genes, 1):
             logging.info(f"Plotting {i}/{len(found_genes)}: {gene_name}")
-            filter_or_plot_gene(gene_name, data_df, out_dir, y_max, y_min)
+            filter_or_plot_gene(
+                gene_name, data_df, out_dir, y_max, y_min, error_bars=error_bars
+            )
 
     # Mode 3: Filter proteins and create a gene list of filtered
     elif args.filter:
