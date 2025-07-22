@@ -3,3 +3,8 @@ data/*
 *.DS_Store*
 outputs/*
 .venv/
+
+# pyinstaller build files
+build/
+main.spec
+dist/

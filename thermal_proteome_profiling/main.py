@@ -1,4 +1,4 @@
-import argparse
+import sys
 import logging
 from pathlib import Path
 from typing import Tuple
@@ -8,6 +8,10 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
+from PySide6.QtWidgets import (QApplication, QWidget, QLabel, QPushButton, QLineEdit, QCheckBox,
+                               QFileDialog, QRadioButton, QButtonGroup, QVBoxLayout, QHBoxLayout, QTextEdit, QMessageBox)
+from PySide6.QtCore import Qt
+
 # Configure logging to stdout with basic settings
 logging.basicConfig(
     level=logging.INFO,
@@ -15,85 +19,33 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()],
 )
 
-
 # custom type converter for argparse using pathlib
 # checks if the given path exists and is a file. Returns a Path object.
 def check_filepath(filepath_str: str) -> Path:
     path = Path(filepath_str)
     if not path.exists():
-        raise argparse.ArgumentTypeError(
+        raise ValueError(
             f"Error: The path '{filepath_str}' does not exist."
         )
     if not path.is_file():
-        raise argparse.ArgumentTypeError(
+        raise ValueError(
             f"Error: The path '{filepath_str}' is not a file."
         )
     return path
-
 
 # custom type converter for argparse using pathlib
 # checks if the given path exists and is a directory. Returns a Path object.
 def check_directory(dir_path_str: str) -> Path:
     path = Path(dir_path_str)
     if not path.exists():
-        raise argparse.ArgumentTypeError(
+        raise ValueError(
             f"Error: The path '{dir_path_str}' does not exist."
         )
     if not path.is_dir():
-        raise argparse.ArgumentTypeError(
+        raise ValueError(
             f"Error: The path '{dir_path_str}' is not a directory."
         )
     return path
-
-
-# Definition of the parser argparse object
-parser = argparse.ArgumentParser(
-    prog="TPP_Plotter",
-    description="A script for the plotting & filtering of thermal proteome profiling melt curves.",
-    epilog="E.g. tpp.py -cf home/data/conditions.csv -d home/data/data.csv",
-)
-
-parser.add_argument(
-    "-d",
-    "--data",
-    required=True,
-    type=check_filepath,
-    help="Path to the data file (must exist).",
-)
-
-parser.add_argument(
-    "-o",
-    "--output_folder",
-    required=True,
-    type=check_directory,
-    help="Path to the output folder (must exist).",
-)
-parser.add_argument(
-    "-e",
-    "--error-bars",
-    action="store_true",
-    help="Add error bars to gene list plots.",
-)
-
-# Add this after your existing parser arguments, before the functions
-mode_group = parser.add_mutually_exclusive_group()
-
-mode_group.add_argument("-g", "--gene", type=str, help="Plot a single gene by name")
-
-mode_group.add_argument(
-    "-gl",
-    "--gene-list",
-    type=check_filepath,
-    help="Path to a text file containing gene names (one per line)",
-)
-
-mode_group.add_argument(
-    "-f",
-    "--filter",
-    action="store_true",
-    help="Filter proteins and add to a gene_list file.",
-)
-
 
 def read_gene_list(file_path: Path) -> list:
     """Read gene names from a text file, one per line"""
@@ -105,7 +57,6 @@ def read_gene_list(file_path: Path) -> list:
     except Exception as e:
         logging.error(f"Error reading {Path}:")
         logging.error(f"{e}")
-
 
 # read in the data file
 def read_data(path: Path) -> Tuple[pd.DataFrame, float, float]:
@@ -119,7 +70,6 @@ def read_data(path: Path) -> Tuple[pd.DataFrame, float, float]:
     except Exception as e:
         logging.error(f"Error reading {Path}:")
         logging.error(f"{e}")
-
 
 def plotter(
     df, y_min, y_max, cell_line, gene_name, output_dir, variants, error_df=None
@@ -200,7 +150,6 @@ def plotter(
         logging.error(f"Error plotting {gene_name} from {cell_line}:")
         logging.error(f"{e}")
 
-
 def get_lines(variants, gene_data, sorted_concentrations, in_column, out_column):
     # check column exists
     if in_column not in gene_data.columns:
@@ -233,7 +182,6 @@ def get_lines(variants, gene_data, sorted_concentrations, in_column, out_column)
     plot_df.rename(columns={"index": "concentration"}, inplace=True)
 
     return plot_df, lines
-
 
 def filter_or_plot_gene(
     gene_name,
@@ -310,7 +258,6 @@ def filter_or_plot_gene(
             error_df,
         )
 
-
 def filter_proteins(line_dictionary, concentrations, variants, threshold=2, flat=False):
     # NOTE: Concentrations are treated as categorical data to equally weight each concentration change
     logging.info("filtering started")
@@ -344,68 +291,230 @@ def filter_proteins(line_dictionary, concentrations, variants, threshold=2, flat
             return True
         return False
 
+class TPPPlotterGUI(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("TPP Plotter")
+        self.setMinimumSize(800, 600)
+        self.init_ui()
+
+    def init_ui(self):
+        # Widgets
+        self.data_label = QLabel("Data File:")
+        self.data_path = QLineEdit()
+        self.data_browse = QPushButton("Browse")
+
+        self.output_label = QLabel("Output Folder:")
+        self.output_path = QLineEdit()
+        self.output_browse = QPushButton("Browse")
+
+        self.error_bars_checkbox = QCheckBox("Add Error Bars")
+
+        # Radio buttons for modes
+        self.mode_group = QButtonGroup(self)
+        self.mode_gene = QRadioButton("Plot Single Gene")
+        self.mode_gene_list = QRadioButton("Plot from Gene List")
+        self.mode_filter = QRadioButton("Filter Proteins")
+        self.mode_all = QRadioButton("Plot All Proteins")
+        self.mode_gene.setChecked(True)
+
+        self.mode_group.addButton(self.mode_gene)
+        self.mode_group.addButton(self.mode_gene_list)
+        self.mode_group.addButton(self.mode_filter)
+        self.mode_group.addButton(self.mode_all)
+
+        self.gene_label = QLabel("Gene Name:")
+        self.gene_input = QLineEdit()
+
+        self.gene_list_label = QLabel("Gene List File:")
+        self.gene_list_path = QLineEdit()
+        self.gene_list_browse = QPushButton("Browse")
+
+        self.run_button = QPushButton("Run")
+
+        self.status_box = QTextEdit()
+        self.status_box.setReadOnly(True)
+        self.status_box.setFixedHeight(150)
+
+        # Layouts
+        main_layout = QVBoxLayout()
+
+        # Data file layout
+        data_layout = QHBoxLayout()
+        data_layout.addWidget(self.data_label)
+        data_layout.addWidget(self.data_path)
+        data_layout.addWidget(self.data_browse)
+        main_layout.addLayout(data_layout)
+
+        # Output folder layout
+        output_layout = QHBoxLayout()
+        output_layout.addWidget(self.output_label)
+        output_layout.addWidget(self.output_path)
+        output_layout.addWidget(self.output_browse)
+        main_layout.addLayout(output_layout)
+
+        # Error bars
+        main_layout.addWidget(self.error_bars_checkbox)
+
+        # Mode selection
+        mode_layout = QVBoxLayout()
+        mode_layout.addWidget(self.mode_gene)
+        mode_layout.addWidget(self.mode_gene_list)
+        mode_layout.addWidget(self.mode_filter)
+        mode_layout.addWidget(self.mode_all)
+        main_layout.addLayout(mode_layout)
+
+        # Gene input
+        gene_layout = QHBoxLayout()
+        gene_layout.addWidget(self.gene_label)
+        gene_layout.addWidget(self.gene_input)
+        main_layout.addLayout(gene_layout)
+
+        # Gene list file layout
+        gene_list_layout = QHBoxLayout()
+        gene_list_layout.addWidget(self.gene_list_label)
+        gene_list_layout.addWidget(self.gene_list_path)
+        gene_list_layout.addWidget(self.gene_list_browse)
+        main_layout.addLayout(gene_list_layout)
+
+        # Run button
+        main_layout.addWidget(self.run_button)
+
+        # Status box
+        main_layout.addWidget(self.status_box)
+
+        self.setLayout(main_layout)
+
+        # Connections
+        self.data_browse.clicked.connect(self.browse_data_file)
+        self.output_browse.clicked.connect(self.browse_output_folder)
+        self.gene_list_browse.clicked.connect(self.browse_gene_list_file)
+        self.run_button.clicked.connect(self.on_run)
+        self.mode_gene.toggled.connect(self.update_mode_inputs)
+        self.mode_gene_list.toggled.connect(self.update_mode_inputs)
+        self.mode_filter.toggled.connect(self.update_mode_inputs)
+        self.mode_all.toggled.connect(self.update_mode_inputs)
+
+        self.update_mode_inputs()
+
+    def log(self, message):
+        self.status_box.append(message)
+
+    def browse_data_file(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select Data File", "", "CSV or TSV Files (*.csv *.tsv *.txt);;All Files (*.*)")
+        if file_path:
+            self.data_path.setText(file_path)
+
+    def browse_output_folder(self):
+        folder_path = QFileDialog.getExistingDirectory(self, "Select Output Folder")
+        if folder_path:
+            self.output_path.setText(folder_path)
+
+    def browse_gene_list_file(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select Gene List File", "", "Text Files (*.txt);;All Files (*.*)")
+        if file_path:
+            self.gene_list_path.setText(file_path)
+
+    def update_mode_inputs(self):
+        # Show/hide input widgets based on selected mode
+        self.gene_label.setEnabled(self.mode_gene.isChecked())
+        self.gene_input.setEnabled(self.mode_gene.isChecked())
+
+        self.gene_list_label.setEnabled(self.mode_gene_list.isChecked())
+        self.gene_list_path.setEnabled(self.mode_gene_list.isChecked())
+        self.gene_list_browse.setEnabled(self.mode_gene_list.isChecked())
+
+    def on_run(self):
+        try:
+            data_file = self.data_path.text()
+            output_folder = self.output_path.text()
+            error_bars = self.error_bars_checkbox.isChecked()
+
+            if not data_file:
+                QMessageBox.warning(self, "Input Error", "Please select a data file.")
+                return
+            if not output_folder:
+                QMessageBox.warning(self, "Input Error", "Please select an output folder.")
+                return
+
+            data_file = check_filepath(data_file)
+            output_folder = check_directory(output_folder)
+
+            mode = None
+            if self.mode_gene.isChecked():
+                mode = "gene"
+            elif self.mode_gene_list.isChecked():
+                mode = "gene_list"
+            elif self.mode_filter.isChecked():
+                mode = "filter"
+            elif self.mode_all.isChecked():
+                mode = "all"
+
+            if mode == "gene":
+                gene_name = self.gene_input.text().strip()
+                if not gene_name:
+                    QMessageBox.warning(self, "Input Error", "Enter a gene name for single gene mode.")
+                    return
+            elif mode == "gene_list":
+                gene_list_file = self.gene_list_path.text()
+                if not gene_list_file:
+                    QMessageBox.warning(self, "Input Error", "Select a gene list file.")
+                    return
+                gene_list_file = check_filepath(gene_list_file)
+
+            self.log(f"Loading data from {data_file}")
+            data_df, y_max, y_min = read_data(data_file)
+
+            if mode == "gene":
+                self.log(f"Plotting single gene: {gene_name}")
+                filter_or_plot_gene(
+                    gene_name, data_df, output_folder, y_max, y_min, error_bars=error_bars
+                )
+            elif mode == "gene_list":
+                self.log(f"Reading gene list from {gene_list_file}")
+                gene_list = read_gene_list(gene_list_file)
+                available_genes = set(data_df["Genes"].unique())
+                found_genes = [gene for gene in gene_list if gene in available_genes]
+                missing_genes = [gene for gene in gene_list if gene not in available_genes]
+                self.log(f"Found {len(found_genes)} genes, {len(missing_genes)} missing")
+
+                filtered_df = data_df[data_df["Genes"].isin(found_genes)]
+                y_max = filtered_df["AVG Log2 Ratio"].max()
+                y_min = filtered_df["AVG Log2 Ratio"].min()
+
+                for i, gene_name in enumerate(found_genes, 1):
+                    self.log(f"Plotting {i}/{len(found_genes)}: {gene_name}")
+                    filter_or_plot_gene(
+                        gene_name, data_df, output_folder, y_max, y_min, error_bars=error_bars
+                    )
+
+            elif mode == "filter":
+                genes = data_df["Genes"].unique()
+                self.log("Applying filter and adding genes to gene list...")
+                for i, gene_name in enumerate(genes, 1):
+                    self.log(f"protein {i}/{len(genes)}")
+                    filter_or_plot_gene(gene_name, data_df, output_folder, y_max, y_min, filter=True, filter_flat=True)
+
+            elif mode == "all":
+                genes = data_df["Genes"].unique()
+                self.log("Plotting all genes...")
+                for i, gene_name in enumerate(genes, 1):
+                    self.log(f"protein {i}/{len(genes)}")
+                    filter_or_plot_gene(gene_name, data_df, output_folder, y_max, y_min, error_bars=error_bars)
+
+            self.log("Processing complete.")
+            QMessageBox.information(self, "Success", "Processing complete!")
+
+        except Exception as e:
+            self.log(f"Error: {str(e)}")
+            logging.error(f"Error in GUI run: {e}")
+            QMessageBox.critical(self, "Error", str(e))
 
 def main():
-    # initiate argparse parser
-    args = parser.parse_args()
-
-    # data file
-    data = args.data
-
-    # output folder
-    out_dir = args.output_folder
-
-    # error bars
-    error_bars = args.error_bars
-
-    # convert data file to dataframe
-    data_df, y_max, y_min = read_data(data)
-
-    # Mode 1: Single gene plotting
-    if args.gene:
-        logging.info(f"Plotting single gene: {args.gene}")
-        filter_or_plot_gene(
-            args.gene, data_df, out_dir, y_max, y_min, error_bars=error_bars
-        )
-
-    # Mode 2: Gene list plotting
-    elif args.gene_list:
-        gene_list = read_gene_list(args.gene_list)
-        available_genes = set(data_df["Genes"].unique())
-        logging.info(f"plotting {len(available_genes)} genes from list...")
-        found_genes = [gene for gene in gene_list if gene in available_genes]
-        missing_genes = [gene for gene in gene_list if gene not in available_genes]
-        logging.info(f"Found {len(found_genes)} genes, {len(missing_genes)} missing")
-
-        filtered_df = data_df[data_df["Genes"].isin(found_genes)]
-        y_max = filtered_df["AVG Log2 Ratio"].max()
-        y_min = filtered_df["AVG Log2 Ratio"].min()
-
-        if missing_genes:
-            logging.info(f"Missing genes: {missing_genes[:5]}...")  # Show first 5
-
-        for i, gene_name in enumerate(found_genes, 1):
-            logging.info(f"Plotting {i}/{len(found_genes)}: {gene_name}")
-            filter_or_plot_gene(
-                gene_name, data_df, out_dir, y_max, y_min, error_bars=error_bars
-            )
-
-    # Mode 3: Filter proteins and create a gene list of filtered
-    elif args.filter:
-        genes = data_df["Genes"].unique()
-        logging.info("Applying filter and adding genes to gene list...")
-        for i, gene_name in enumerate(genes, 1):
-            logging.info(f"protein {i}/{len(genes)}")
-            filter_or_plot_gene(gene_name, data_df, out_dir, y_max, y_min, True, True)
-
-    # Mode 4: Plot all proteins
-    else:
-        genes = data_df["Genes"].unique()
-        logging.info("Plotting all genes...")
-        for i, gene_name in enumerate(genes, 1):
-            logging.info(f"protein {i}/{len(genes)}")
-            filter_or_plot_gene(gene_name, data_df, out_dir, y_max, y_min)
-
+    app = QApplication(sys.argv)
+    window = TPPPlotterGUI()
+    window.show()
+    sys.exit(app.exec())
 
 if __name__ == "__main__":
     main()
