@@ -1,7 +1,7 @@
 import sys
 import logging
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, List
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -47,7 +47,7 @@ def check_directory(dir_path_str: str) -> Path:
         )
     return path
 
-def read_gene_list(file_path: Path) -> list:
+def read_gene_list(file_path: Path) -> List:
     """Read gene names from a text file, one per line"""
     try:
         with open(file_path, "r") as f:
@@ -55,8 +55,9 @@ def read_gene_list(file_path: Path) -> list:
         logging.info(f"{len(genes)} genes read from gene list")
         return genes
     except Exception as e:
-        logging.error(f"Error reading {Path}:")
+        logging.error(f"Error reading {file_path}:")
         logging.error(f"{e}")
+        return []
 
 # read in the data file
 def read_data(path: Path) -> Tuple[pd.DataFrame, float, float]:
@@ -65,10 +66,10 @@ def read_data(path: Path) -> Tuple[pd.DataFrame, float, float]:
         filtered_df = data_df[data_df["# Unique Total Peptides"] >= 2]
         highest_fld_chng = filtered_df["AVG Log2 Ratio"].max()
         lowest_fld_chng = filtered_df["AVG Log2 Ratio"].min()
-        logging.info(f"{Path} read success")
+        logging.info(f"{path} read success")
         return filtered_df, highest_fld_chng, lowest_fld_chng
     except Exception as e:
-        logging.error(f"Error reading {Path}:")
+        logging.error(f"Error reading {path}:")
         logging.error(f"{e}")
 
 def plotter(
