@@ -3,3 +3,7 @@ data/*
 *.DS_Store*
 outputs/*
 .venv/
+dist/
+data.tsv
+main.spec
+build/

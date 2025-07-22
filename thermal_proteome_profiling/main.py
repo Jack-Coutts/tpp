@@ -1,7 +1,6 @@
-import argparse
 import logging
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,165 +10,100 @@ import seaborn as sns
 # Configure logging to stdout with basic settings
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler()],
 )
 
+# --- Interactive Helper Functions ---
 
-# custom type converter for argparse using pathlib
-# checks if the given path exists and is a file. Returns a Path object.
-def check_filepath(filepath_str: str) -> Path:
-    path = Path(filepath_str)
-    if not path.exists():
-        raise argparse.ArgumentTypeError(
-            f"Error: The path '{filepath_str}' does not exist."
-        )
-    if not path.is_file():
-        raise argparse.ArgumentTypeError(
-            f"Error: The path '{filepath_str}' is not a file."
-        )
-    return path
+def prompt_for_path(prompt_text: str, check_for_file: bool) -> Path:
+    """Repeatedly prompts the user for a path until a valid one is given."""
+    while True:
+        path_str = input(prompt_text).strip()
+        path = Path(path_str)
+        if not path.exists():
+            logging.error(f"Error: The path '{path_str}' does not exist. Please try again.")
+            continue
+        if check_for_file and not path.is_file():
+            logging.error(f"Error: The path '{path_str}' is not a file. Please try again.")
+            continue
+        if not check_for_file and not path.is_dir():
+            logging.error(f"Error: The path '{path_str}' is not a directory. Please try again.")
+            continue
+        return path
 
+def ask_yes_no(prompt_text: str) -> bool:
+    """Asks a yes/no question and returns a boolean."""
+    while True:
+        answer = input(f"{prompt_text} (y/n): ").strip().lower()
+        if answer in ["y", "yes"]:
+            return True
+        if answer in ["n", "no"]:
+            return False
+        logging.warning("Invalid input. Please enter 'y' or 'n'.")
 
-# custom type converter for argparse using pathlib
-# checks if the given path exists and is a directory. Returns a Path object.
-def check_directory(dir_path_str: str) -> Path:
-    path = Path(dir_path_str)
-    if not path.exists():
-        raise argparse.ArgumentTypeError(
-            f"Error: The path '{dir_path_str}' does not exist."
-        )
-    if not path.is_dir():
-        raise argparse.ArgumentTypeError(
-            f"Error: The path '{dir_path_str}' is not a directory."
-        )
-    return path
-
-
-# Definition of the parser argparse object
-parser = argparse.ArgumentParser(
-    prog="TPP_Plotter",
-    description="A script for the plotting & filtering of thermal proteome profiling melt curves.",
-    epilog="E.g. tpp.py -cf home/data/conditions.csv -d home/data/data.csv",
-)
-
-parser.add_argument(
-    "-d",
-    "--data",
-    required=True,
-    type=check_filepath,
-    help="Path to the data file (must exist).",
-)
-
-parser.add_argument(
-    "-o",
-    "--output_folder",
-    required=True,
-    type=check_directory,
-    help="Path to the output folder (must exist).",
-)
-parser.add_argument(
-    "-e",
-    "--error-bars",
-    action="store_true",
-    help="Add error bars to gene list plots.",
-)
-
-# Add this after your existing parser arguments, before the functions
-mode_group = parser.add_mutually_exclusive_group()
-
-mode_group.add_argument("-g", "--gene", type=str, help="Plot a single gene by name")
-
-mode_group.add_argument(
-    "-gl",
-    "--gene-list",
-    type=check_filepath,
-    help="Path to a text file containing gene names (one per line)",
-)
-
-mode_group.add_argument(
-    "-f",
-    "--filter",
-    action="store_true",
-    help="Filter proteins and add to a gene_list file.",
-)
-
+# --- Core Logic (Largely Unchanged) ---
 
 def read_gene_list(file_path: Path) -> list:
-    """Read gene names from a text file, one per line"""
+    """Read gene names from a text file, one per line."""
     try:
         with open(file_path, "r") as f:
             genes = [line.strip() for line in f if line.strip()]
         logging.info(f"{len(genes)} genes read from gene list")
         return genes
     except Exception as e:
-        logging.error(f"Error reading {Path}:")
-        logging.error(f"{e}")
+        logging.error(f"Error reading {file_path}:\n{e}")
+        return []
 
-
-# read in the data file
-def read_data(path: Path) -> Tuple[pd.DataFrame, float, float]:
+def read_data(path: Path) -> Optional[Tuple[pd.DataFrame, float, float]]:
+    """Reads and performs initial filtering on the data file."""
     try:
         data_df = pd.read_csv(path, delimiter="\t")
         filtered_df = data_df[data_df["# Unique Total Peptides"] >= 2]
+        if filtered_df.empty:
+            logging.error("No data remains after filtering for '# Unique Total Peptides' >= 2.")
+            return None
         highest_fld_chng = filtered_df["AVG Log2 Ratio"].max()
         lowest_fld_chng = filtered_df["AVG Log2 Ratio"].min()
-        logging.info(f"{Path} read success")
+        logging.info(f"{path} read success")
         return filtered_df, highest_fld_chng, lowest_fld_chng
     except Exception as e:
-        logging.error(f"Error reading {Path}:")
-        logging.error(f"{e}")
+        logging.error(f"Error reading or processing {path}:\n{e}")
+        return None
 
-
-def plotter(
-    df, y_min, y_max, cell_line, gene_name, output_dir, variants, error_df=None
-):
+def plotter(df, y_min, y_max, cell_line, gene_name, output_dir, variants, error_df=None):
+    """Generates and saves a single plot."""
     try:
-        # Set seaborn style
         sns.set_style("whitegrid")
         plt.rcParams["font.size"] = 11
 
-        # ensure line colour consistency
-        try:
-            sorted_variants = sorted(variants, key=lambda x: x[0])
-            variant_palette = {
-                sorted_variants[0]: "#1f77b4",
-                sorted_variants[1]: "#d62728",
-            }
-            logging.info(f"Sorted variants exist: {sorted_variants}")
-        except Exception as e:
-            logging.error(
-                f"Less than 2 protein varainats exist: Variants: {variants}\n Error: {e}"
-            )
+        sorted_variants = sorted(variants)
+        if len(sorted_variants) < 2:
+            logging.error(f"Cannot plot {gene_name}, requires at least 2 variants, found {len(sorted_variants)}")
             return
+
+        variant_palette = {sorted_variants[0]: "#1f77b4", sorted_variants[1]: "#d62728"}
 
         sns.lineplot(
             data=df,
-            x="concentration",  # categorical, equally spaced
+            x="concentration",
             y="log_fld_change",
-            hue="variant",  # separate lines per variant
+            hue="variant",
             palette=variant_palette,
-            hue_order=[sorted_variants[0], sorted_variants[1]],
+            hue_order=sorted_variants,
             marker="o",
             linewidth=2,
             markersize=6,
         )
 
-        # Add error bars if error_df is provided
         if error_df is not None:
             ax = plt.gca()
             unique_concentrations = df["concentration"].unique()
-            concentration_to_x = {
-                conc: i for i, conc in enumerate(unique_concentrations)
-            }
-
+            concentration_to_x = {conc: i for i, conc in enumerate(unique_concentrations)}
             for variant in sorted_variants:
                 variant_data = df[df["variant"] == variant]
                 error_data = error_df[error_df["variant"] == variant]
-                x_positions = [
-                    concentration_to_x[conc] for conc in variant_data["concentration"]
-                ]
-
+                x_positions = [concentration_to_x[conc] for conc in variant_data["concentration"]]
                 ax.errorbar(
                     x=x_positions,
                     y=variant_data["log_fld_change"],
@@ -177,235 +111,181 @@ def plotter(
                     fmt="none",
                     color=variant_palette[variant],
                     capsize=4,
-                    capthick=1.5,
-                    alpha=0.8,
                 )
 
         plt.ylim(y_min, y_max)
         plt.xlabel("Concentration", fontsize=12)
         plt.ylabel("AVG Log2 Ratio", fontsize=12)
         plt.title(f"{cell_line} {gene_name}", fontsize=14, fontweight="bold", pad=20)
-        # Add horizontal line at y=0
         plt.axhline(y=0, color="gray", linewidth=0.8, alpha=0.7)
-        # Legend styling
         plt.legend(frameon=True, fancybox=True, shadow=True)
         plt.tight_layout()
-        plt.savefig(
-            f"{output_dir}/{gene_name}_{cell_line}.png", dpi=300, bbox_inches="tight"
-        )
+        plt.savefig(f"{output_dir}/{gene_name}_{cell_line}.png", dpi=300, bbox_inches="tight")
         plt.close()
         logging.info(f"{gene_name} from {cell_line} plotted")
-
     except Exception as e:
-        logging.error(f"Error plotting {gene_name} from {cell_line}:")
-        logging.error(f"{e}")
-
+        logging.error(f"Error plotting {gene_name} from {cell_line}:\n{e}")
 
 def get_lines(variants, gene_data, sorted_concentrations, in_column, out_column):
-    # check column exists
-    if in_column not in gene_data.columns:
-        raise ValueError(f"Column {in_column} not found in dataset")
-
+    """Reshapes data for plotting by extracting values for each variant curve."""
     lines = {}
     for variant in variants:
         lines[variant] = []
-        var_mask = (
-            gene_data["Comparison (group1/group2)"].str.split("_").str[1] == variant
-        )
+        var_mask = gene_data["Comparison (group1/group2)"].str.split("_").str[1] == variant
         variant_df = gene_data[var_mask]
-
         for concentration in sorted_concentrations:
             try:
-                column_value = variant_df.loc[
-                    variant_df["Comparison (group1/group2)"].str.contains(
-                        concentration, na=False
-                    ),
-                    in_column,
-                ].iloc[0]
+                row_mask = variant_df["Comparison (group1/group2)"].str.contains(concentration, na=False)
+                column_value = variant_df.loc[row_mask, in_column].iloc[0]
                 lines[variant].append(column_value)
-            except Exception as e:
-                logging.error(f"Error getting line for {variant} at {concentration}:")
-                logging.error(f"{e}")
-                lines[variant].append(None)
+            except IndexError:
+                logging.warning(f"Missing data for variant '{variant}' at concentration '{concentration}'")
+                lines[variant].append(np.nan)
 
     plot_df = pd.DataFrame(lines, index=sorted_concentrations).reset_index()
     plot_df = plot_df.melt(id_vars="index", var_name="variant", value_name=out_column)
     plot_df.rename(columns={"index": "concentration"}, inplace=True)
-
-    return plot_df, lines
-
-
-def filter_or_plot_gene(
-    gene_name,
-    data_df,
-    output_dir,
-    highest_y_value,
-    lowest_y_value,
-    filter=False,
-    filter_flat=False,
-    error_bars=False,
-):
-    # Filter data for the specific gene
-    gene_data = data_df[data_df["Genes"] == gene_name]
-
-    # check gene data exists
-    if gene_data.empty:
-        print(f"No data found for gene: {gene_name}")
-        return None
-
-    # cell line name
-    cell_line = gene_data["Comparison (group1/group2)"].iloc[0].split("_")[0]
-
-    # protein variants
-    variants = gene_data["Comparison (group1/group2)"].str.split("_").str[1].unique()
-
-    # concentrations
-    concentrations = (
-        gene_data["Comparison (group1/group2)"]
-        .str.split("_")
-        .str[2]  # get the third element of each split
-        .str.split(" ")
-        .str[0]  # get the part before the first space
-        .unique()  # get unique values
-    )
-
-    sorted_concentrations = sorted(concentrations, key=lambda x: float(x.rstrip("uM")))
-
-    # Create line df
-    plot_df, lines = get_lines(
-        variants, gene_data, sorted_concentrations, "AVG Log2 Ratio", "log_fld_change"
-    )
-
-    error_df = None
-    if error_bars:
-        error_df, error_lines = get_lines(
-            variants,
-            gene_data,
-            sorted_concentrations,
-            "Standard Error",
-            "Standard Error",
-        )
-
-    # filter
-    if filter:
-        if filter_proteins(lines, sorted_concentrations, variants, flat=filter_flat):
-            logging.info(f"{gene_name} from {cell_line} passed filtering")
-            with open("data/gene_list_from_filtering.txt", "a") as f:
-                # Only add a newline if the file is not empty
-                if f.tell() != 0:
-                    f.write("\n")
-                f.write(gene_name)
-        else:
-            logging.info(f"{gene_name} from {cell_line} was removed in filtering")
-
-    else:
-        plotter(
-            plot_df,
-            lowest_y_value,
-            highest_y_value,
-            cell_line,
-            gene_name,
-            output_dir,
-            variants,
-            error_df,
-        )
+    return plot_df.dropna(), lines
 
 
-def filter_proteins(line_dictionary, concentrations, variants, threshold=2, flat=False):
-    # NOTE: Concentrations are treated as categorical data to equally weight each concentration change
-    logging.info("filtering started")
-    logging.info(f"Area between curves threshold: {threshold}")
-
-    # Convert to arrays
+def filter_proteins(line_dictionary: dict, variants: list, flat: bool = False) -> bool:
+    """Filters proteins based on area between curves and control curve flatness."""
+    threshold = 2.0
     y1 = np.array(line_dictionary[variants[0]])
     y2 = np.array(line_dictionary[variants[1]])
-    x = np.arange(len(concentrations))  # [0, 1, 2, 3] for equidistant x values
 
-    # Compute absolute differences and area
-    abs_diff = np.abs(y1 - y2)
-    area = np.trapezoid(abs_diff, x)
-
-    if flat:
-        # Check that control curve is flat
-        flatness_threshold = 0.35
-        logging.info(
-            f"Standard deviation/Control curve flatness threshold: {flatness_threshold}"
-        )
-        control_curve_name = "R"
-        logging.info(f"control curve name: {control_curve_name}")
-        ctrl_curve = np.array(line_dictionary[control_curve_name])  # change R as needed
-        std_dev = np.std(ctrl_curve)
-        is_flat = std_dev < flatness_threshold
-
-        if area > threshold and is_flat:
-            return True
-    else:
-        if area > threshold:
-            return True
+    # Ignore NaN values for calculation
+    valid_indices = ~np.isnan(y1) & ~np.isnan(y2)
+    if np.sum(valid_indices) < 2: # Need at least 2 points to calculate area
         return False
 
+    y1, y2 = y1[valid_indices], y2[valid_indices]
+    x = np.arange(len(y1))
+
+    area = np.trapz(np.abs(y1 - y2), x)
+
+    if not flat:
+        return area > threshold
+
+    # Check that control curve is flat
+    flatness_threshold = 0.35
+    control_curve_name = "R"  # NOTE: Assuming 'R' is the control variant name
+    if control_curve_name not in line_dictionary:
+        logging.warning(f"Control variant '{control_curve_name}' not found for flatness check.")
+        return False
+
+    ctrl_curve = np.array(line_dictionary[control_curve_name])
+    ctrl_curve = ctrl_curve[~np.isnan(ctrl_curve)] # remove NaNs
+    if len(ctrl_curve) < 2:
+        return False
+
+    is_flat = np.std(ctrl_curve) < flatness_threshold
+    return area > threshold and is_flat
+
+
+def filter_or_plot_gene(gene_name, data_df, output_dir, highest_y, lowest_y, do_filter=False, filter_flat=False, error_bars=False):
+    """Main processing function for a single gene to either filter it or plot it."""
+    gene_data = data_df[data_df["Genes"] == gene_name]
+    if gene_data.empty:
+        logging.warning(f"No data found for gene: {gene_name}")
+        return
+
+    try:
+        cell_line = gene_data["Comparison (group1/group2)"].iloc[0].split("_")[0]
+        variants = sorted(gene_data["Comparison (group1/group2)"].str.split("_").str[1].unique())
+        concentrations = gene_data["Comparison (group1/group2)"].str.split("_").str[2].str.split(" ").str[0].unique()
+        sorted_concentrations = sorted(concentrations, key=lambda x: float(x.rstrip("uM")))
+    except IndexError:
+        logging.error(f"Could not parse metadata for {gene_name}. Skipping.")
+        return
+
+    plot_df, lines = get_lines(variants, gene_data, sorted_concentrations, "AVG Log2 Ratio", "log_fld_change")
+    if plot_df.empty:
+        logging.warning(f"No valid data to process for gene {gene_name}.")
+        return
+
+    if do_filter:
+        if filter_proteins(lines, variants, flat=filter_flat):
+            logging.info(f"{gene_name} from {cell_line} PASSED filtering")
+            with open(output_dir / "gene_list_from_filtering.txt", "a") as f:
+                f.write(f"{gene_name}\n")
+        else:
+            logging.info(f"{gene_name} from {cell_line} was removed by filtering")
+    else:
+        error_df = None
+        if error_bars:
+            error_df, _ = get_lines(variants, gene_data, sorted_concentrations, "Standard Error", "Standard Error")
+        plotter(plot_df, lowest_y, highest_y, cell_line, gene_name, output_dir, variants, error_df)
+
+
+# --- Main Application Logic ---
 
 def main():
-    # initiate argparse parser
-    args = parser.parse_args()
+    """Runs the interactive command-line application."""
+    print("--- Thermal Proteome Profiling (TPP) Plotter ---")
 
-    # data file
-    data = args.data
+    # 1. Get input and output paths
+    data_path = prompt_for_path("Enter the path to your data file (e.g., data.tsv): ", check_for_file=True)
+    output_dir = prompt_for_path("Enter the path to your output folder: ", check_for_file=False)
 
-    # output folder
-    out_dir = args.output_folder
+    # 2. Read and process data
+    data_tuple = read_data(data_path)
+    if not data_tuple:
+        return
+    data_df, y_max_global, y_min_global = data_tuple
 
-    # error bars
-    error_bars = args.error_bars
+    # 3. Present menu and get user choice
+    print("\nWhat would you like to do?")
+    print("  1. Plot a single gene")
+    print("  2. Plot a list of genes from a file")
+    print("  3. Filter all proteins and create a gene list file")
+    print("  4. Plot all proteins in the dataset (can be slow!)")
 
-    # convert data file to dataframe
-    data_df, y_max, y_min = read_data(data)
+    while True:
+        choice = input("Enter your choice (1-4): ").strip()
+        if choice in ["1", "2", "3", "4"]:
+            break
+        logging.warning("Invalid choice. Please enter a number between 1 and 4.")
 
-    # Mode 1: Single gene plotting
-    if args.gene:
-        logging.info(f"Plotting single gene: {args.gene}")
-        filter_or_plot_gene(
-            args.gene, data_df, out_dir, y_max, y_min, error_bars=error_bars
-        )
+    # 4. Execute the chosen action
+    if choice == "1":
+        gene_name = input("Enter the gene name to plot: ").strip()
+        error_bars = ask_yes_no("Add error bars to the plot?")
+        filter_or_plot_gene(gene_name, data_df, output_dir, y_max_global, y_min_global, error_bars=error_bars)
 
-    # Mode 2: Gene list plotting
-    elif args.gene_list:
-        gene_list = read_gene_list(args.gene_list)
-        available_genes = set(data_df["Genes"].unique())
-        logging.info(f"plotting {len(available_genes)} genes from list...")
-        found_genes = [gene for gene in gene_list if gene in available_genes]
-        missing_genes = [gene for gene in gene_list if gene not in available_genes]
-        logging.info(f"Found {len(found_genes)} genes, {len(missing_genes)} missing")
+    elif choice == "2":
+        gene_list_path = prompt_for_path("Enter the path to your gene list file: ", check_for_file=True)
+        gene_list = read_gene_list(gene_list_path)
+        if not gene_list: return
 
-        filtered_df = data_df[data_df["Genes"].isin(found_genes)]
-        y_max = filtered_df["AVG Log2 Ratio"].max()
-        y_min = filtered_df["AVG Log2 Ratio"].min()
+        error_bars = ask_yes_no("Add error bars to the plots?")
+        # Recalculate y-axis limits for just the genes in the list for better scaling
+        list_df = data_df[data_df["Genes"].isin(gene_list)]
+        y_max_list = list_df["AVG Log2 Ratio"].max()
+        y_min_list = list_df["AVG Log2 Ratio"].min()
 
-        if missing_genes:
-            logging.info(f"Missing genes: {missing_genes[:5]}...")  # Show first 5
+        for i, gene_name in enumerate(gene_list, 1):
+            logging.info(f"Plotting {i}/{len(gene_list)}: {gene_name}")
+            filter_or_plot_gene(gene_name, data_df, output_dir, y_max_list, y_min_list, error_bars=error_bars)
 
-        for i, gene_name in enumerate(found_genes, 1):
-            logging.info(f"Plotting {i}/{len(found_genes)}: {gene_name}")
-            filter_or_plot_gene(
-                gene_name, data_df, out_dir, y_max, y_min, error_bars=error_bars
-            )
-
-    # Mode 3: Filter proteins and create a gene list of filtered
-    elif args.filter:
+    elif choice == "3":
+        logging.info("Applying filter and adding passed genes to 'gene_list_from_filtering.txt' in your output folder.")
         genes = data_df["Genes"].unique()
-        logging.info("Applying filter and adding genes to gene list...")
         for i, gene_name in enumerate(genes, 1):
-            logging.info(f"protein {i}/{len(genes)}")
-            filter_or_plot_gene(gene_name, data_df, out_dir, y_max, y_min, True, True)
+            logging.info(f"Filtering protein {i}/{len(genes)}: {gene_name}")
+            # The last two arguments enable filtering with the flatness check
+            filter_or_plot_gene(gene_name, data_df, output_dir, y_max_global, y_min_global, do_filter=True, filter_flat=True)
 
-    # Mode 4: Plot all proteins
-    else:
+    elif choice == "4":
+        if not ask_yes_no("This will plot all proteins and may take a long time. Are you sure?"):
+            print("Operation cancelled.")
+            return
         genes = data_df["Genes"].unique()
-        logging.info("Plotting all genes...")
         for i, gene_name in enumerate(genes, 1):
-            logging.info(f"protein {i}/{len(genes)}")
-            filter_or_plot_gene(gene_name, data_df, out_dir, y_max, y_min)
+            logging.info(f"Plotting protein {i}/{len(genes)}: {gene_name}")
+            filter_or_plot_gene(gene_name, data_df, output_dir, y_max_global, y_min_global)
 
+    print("\n Operation complete. Check your output folder for results.")
 
 if __name__ == "__main__":
     main()
