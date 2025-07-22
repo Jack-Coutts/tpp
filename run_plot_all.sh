@@ -7,11 +7,6 @@ for file in data/*; do
     echo "Running thermal proteome profiling script on $file ...."
 
     # plot all mode
-    poetry run python3 thermal_proteome_profiling/main.py -d $file -o outputs/filtered/
+    uv run python thermal_proteome_profiling/main.py -d $file -o outputs/filtered/
 
 done
-
-
-
-
-

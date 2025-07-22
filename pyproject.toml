@@ -1,20 +1,19 @@
-[tool.poetry]
+[project]
 name = "thermal-proteome-profiling"
 version = "0.1.0"
 description = ""
-authors = ["Jack Coutts <jackwgcoutts@proton.me>"]
+authors = [{ name = "Jack Coutts", email = "jackwgcoutts@proton.me" }]
+requires-python = "~=3.12.0"
 readme = "README.md"
-
-[tool.poetry.dependencies]
-python = "^3.12"
-pandas = "^2.2.3"
-matplotlib = "^3.9.2"
-seaborn = "^0.13.2"
-scipy = "^1.14.1"
-numpy = "^2.1.3"
-scikit-learn = "^1.5.2"
-
+dependencies = [
+    "pandas>=2.2.3,<3",
+    "matplotlib>=3.9.2,<4",
+    "seaborn>=0.13.2,<0.14",
+    "scipy>=1.14.1,<2",
+    "numpy>=2.1.3,<3",
+    "scikit-learn>=1.5.2,<2",
+]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+build-backend = "hatchling.build"
+requires = ["hatchling>=1,<2"]
