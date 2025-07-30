@@ -78,6 +78,9 @@ class TPPPlotterGUI(QWidget):
         self.status_box.setReadOnly(True)
         self.status_box.setFixedHeight(150)
 
+        self.stop_button = QPushButton("Stop")
+        self.stop_button.setEnabled(False)  # Disabled until processing starts
+
         # Layouts
         main_layout = QVBoxLayout()
 
@@ -147,6 +150,9 @@ class TPPPlotterGUI(QWidget):
         # logging box
         main_layout.addWidget(self.status_box)
 
+        # stop button
+        main_layout.addWidget(self.stop_button)
+
         self.setLayout(main_layout)
 
         # Connections
@@ -158,6 +164,7 @@ class TPPPlotterGUI(QWidget):
         self.mode_gene_list.toggled.connect(self.update_mode_inputs)
         self.mode_filter.toggled.connect(self.update_mode_inputs)
         self.mode_all.toggled.connect(self.update_mode_inputs)
+        self.stop_button.clicked.connect(self.on_stop)
 
         self.update_mode_inputs()
 
@@ -211,7 +218,21 @@ class TPPPlotterGUI(QWidget):
         self.gene_list_path.setEnabled(self.mode_gene_list.isChecked())
         self.gene_list_browse.setEnabled(self.mode_gene_list.isChecked())
 
+    def reset_ui(self):
+        self.run_button.setEnabled(True)
+        self.stop_button.setEnabled(False)
+        logging.info("App reset to inactive state.")
+
+    def on_stop(self):
+        if hasattr(self, "worker") and self.worker:
+            self.worker.request_stop()
+            logging.info("Stop requested... waiting for processing to halt.")
+            self.stop_button.setEnabled(
+                False
+            )  # Disable immediately to prevent multiple clicks
+
     def on_run(self):
+        self.reset_ui()
         try:
             data_file_str = self.data_path.text()
             output_folder_str = self.output_path.text()
@@ -230,11 +251,9 @@ class TPPPlotterGUI(QWidget):
             output_folder = check_directory(output_folder_str)
 
             # different logic for plotting a single line or two lines
+            single_mode = True
             if self.two_lines.isChecked():
-                pass
-
-            else:
-                pass
+                single_mode = False
 
             mode = None
             gene_name = None
@@ -263,7 +282,13 @@ class TPPPlotterGUI(QWidget):
             # Create worker and thread
             self.thread = QThread()
             self.worker = Worker(
-                data_file, output_folder, error_bars, mode, gene_name, gene_list_file
+                data_file,
+                output_folder,
+                single_mode,
+                error_bars,
+                mode,
+                gene_name,
+                gene_list_file,
             )
             self.worker.moveToThread(self.thread)
 
@@ -271,14 +296,33 @@ class TPPPlotterGUI(QWidget):
             self.thread.started.connect(self.worker.run)
             self.worker.finished.connect(self.thread.quit)
             self.worker.finished.connect(self.worker.deleteLater)
-            self.thread.finished.connect(self.thread.deleteLater)
+
+            # Connect worker signals to UI reset
+            self.worker.finished.connect(self.reset_ui)
+            self.worker.error.connect(self.reset_ui)
+            self.worker.stopped.connect(self.reset_ui)
+
+            # Connect thread.finished to safe cleanup
+            self.thread.finished.connect(self.on_thread_finished)
 
             # Start the thread
             self.thread.start()
 
-            # Disable run button while processing
             self.run_button.setEnabled(False)
-            self.thread.finished.connect(lambda: self.run_button.setEnabled(True))
+            self.stop_button.setEnabled(True)
 
         except Exception as e:
             logging.error(f"Error starting worker: {e}")
+            self.reset_ui()
+
+    # safe cleanup method
+    @Slot()
+    def on_thread_finished(self):
+        if self.thread.isRunning():
+            if not self.thread.wait(5000):  # Wait up to 5 seconds; adjust as needed
+                logging.warning("Thread did not finish in time - forcing quit")
+                self.thread.quit()
+                self.thread.wait()  # Wait again after force quit
+        self.thread.deleteLater()  # Now safe to delete
+        self.stop_button.setEnabled(False)  # Ensure Stop is disabled
+        self.reset_ui()  # Final reset

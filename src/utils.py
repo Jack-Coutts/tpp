@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from pandas.core.generic import NoReturn
 
 
 # custom type converter for argparse using pathlib
@@ -57,6 +58,27 @@ def read_data(path: Path) -> Tuple[pd.DataFrame, float, float]:
         logging.error(f"{e}")
 
 
+def get_variants(df: pd.DataFrame, single_mode: bool) -> List[str] | NoReturn:
+    variants = list(df["Comparison (group1/group2)"].str.split("_").str[1].unique())
+
+    if single_mode and len(variants) == 1:
+        logging.info(f"one variant found successfuly: {variants[0]}")
+        return variants
+    elif single_mode and len(variants) < 1:
+        logging.error("check comparison naming, no variants found")
+        raise AssertionError("No variants found in data")
+    elif single_mode is False and len(variants) == 2:
+        logging.info(f"two variants found successfully: {variants}")
+        return variants
+    elif single_mode is False and len(variants) != 2:
+        var_num = len(variants)
+        logging.error(f"check comparison naming, {var_num} variants found")
+        raise AssertionError("Incorrect number of variants found in data")
+    else:
+        logging.error("incorrect number of variants")
+        raise RuntimeError("Error getting variants")
+
+
 def plotter(
     df, y_min, y_max, cell_line, gene_name, output_dir, variants, error_df=None
 ):
@@ -78,7 +100,6 @@ def plotter(
                 sorted_variants[0]: "#1f77b4",
                 sorted_variants[1]: "#d62728",
             }
-            logging.info(f"Sorted variants exist: {sorted_variants}")
         except Exception as e:
             logging.error(
                 f"Less than 2 protein varainats exist: Variants: {variants}\n Error: {e}"
@@ -136,7 +157,6 @@ def plotter(
             f"{output_dir}/{gene_name}_{cell_line}.png", dpi=300, bbox_inches="tight"
         )
         plt.close()
-        logging.info(f"{gene_name} from {cell_line} plotted")
 
     except Exception as e:
         logging.error(f"Error plotting {gene_name} from {cell_line}:")
@@ -177,15 +197,13 @@ def get_lines(variants, gene_data, sorted_concentrations, in_column, out_column)
     return plot_df, lines
 
 
-def filter_or_plot_gene(
+def plot_gene(
     gene_name,
     data_df,
     output_dir,
-    cell_line,
+    variants,
     highest_y_value,
     lowest_y_value,
-    filter=False,
-    filter_flat=False,
     error_bars=False,
 ):
     # Filter data for the specific gene
@@ -210,8 +228,6 @@ def filter_or_plot_gene(
     )
     sorted_concentrations = sorted(concentrations, key=lambda x: float(x.rstrip("uM")))
 
-    variants = gene_data["Comparison (group1/group2)"].str.split("_").str[1].unique()
-
     # Create line df
     plot_df, lines = get_lines(
         variants,
@@ -231,29 +247,16 @@ def filter_or_plot_gene(
             "Standard Error",
         )
 
-    # filter
-    if filter:
-        if filter_proteins(lines, sorted_concentrations, variants, flat=filter_flat):
-            logging.info(f"{gene_name} from {cell_line} passed filtering")
-            with open("data/gene_list_from_filtering.txt", "a") as f:
-                # Only add a newline if the file is not empty
-                if f.tell() != 0:
-                    f.write("\n")
-                f.write(gene_name)
-        else:
-            logging.info(f"{gene_name} from {cell_line} was removed in filtering")
-
-    else:
-        plotter(
-            plot_df,
-            lowest_y_value,
-            highest_y_value,
-            cell_line,
-            gene_name,
-            output_dir,
-            variants,
-            error_df,
-        )
+    plotter(
+        plot_df,
+        lowest_y_value,
+        highest_y_value,
+        cell_line,
+        gene_name,
+        output_dir,
+        variants,
+        error_df,
+    )
 
 
 def filter_proteins(line_dictionary, concentrations, variants, threshold=2, flat=False):
