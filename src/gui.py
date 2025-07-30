@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
     QFileDialog,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -39,7 +40,14 @@ class TPPPlotterGUI(QWidget):
         self.output_path = QLineEdit()
         self.output_browse = QPushButton("Browse")
 
-        self.error_bars_checkbox = QCheckBox("Add Error Bars")
+        # radio buttons for multi-line plotting
+        self.multi_line = QButtonGroup(self)
+        self.single_line = QRadioButton("Plot One Line")
+        self.two_lines = QRadioButton("Plot Two Lines")
+        self.two_lines.setChecked(True)
+
+        self.multi_line.addButton(self.single_line)
+        self.multi_line.addButton(self.two_lines)
 
         # Radio buttons for modes
         self.mode_group = QButtonGroup(self)
@@ -60,6 +68,9 @@ class TPPPlotterGUI(QWidget):
         self.gene_list_label = QLabel("Gene List File:")
         self.gene_list_path = QLineEdit()
         self.gene_list_browse = QPushButton("Browse")
+
+        # error bars checkbox
+        self.error_bars_checkbox = QCheckBox("Add Error Bars")
 
         self.run_button = QPushButton("Run")
 
@@ -84,8 +95,19 @@ class TPPPlotterGUI(QWidget):
         output_layout.addWidget(self.output_browse)
         main_layout.addLayout(output_layout)
 
-        # Error bars
-        main_layout.addWidget(self.error_bars_checkbox)
+        # multi line
+        multi_line = QVBoxLayout()
+        multi_line.addWidget(self.single_line)
+        multi_line.addWidget(self.two_lines)
+        main_layout.addLayout(multi_line)
+
+        # horizonatal divider
+        divider = QFrame()
+        divider.setFrameShape(QFrame.Shape.HLine)  # Set the shape to a horizontal line
+        divider.setFrameShadow(
+            QFrame.Shadow.Sunken
+        )  # Set the shadow to make it visible
+        main_layout.addWidget(divider)
 
         # Mode selection
         mode_layout = QVBoxLayout()
@@ -107,6 +129,17 @@ class TPPPlotterGUI(QWidget):
         gene_list_layout.addWidget(self.gene_list_path)
         gene_list_layout.addWidget(self.gene_list_browse)
         main_layout.addLayout(gene_list_layout)
+
+        # horzontal divider
+        divider1 = QFrame()
+        divider1.setFrameShape(QFrame.Shape.HLine)  # Set the shape to a horizontal line
+        divider1.setFrameShadow(
+            QFrame.Shadow.Sunken
+        )  # Set the shadow to make it visible
+        main_layout.addWidget(divider1)
+
+        # Error bars
+        main_layout.addWidget(self.error_bars_checkbox)
 
         # Run button
         main_layout.addWidget(self.run_button)
@@ -196,6 +229,13 @@ class TPPPlotterGUI(QWidget):
             data_file = check_filepath(data_file_str)
             output_folder = check_directory(output_folder_str)
 
+            # different logic for plotting a single line or two lines
+            if self.two_lines.isChecked():
+                pass
+
+            else:
+                pass
+
             mode = None
             gene_name = None
             gene_list_file = None
@@ -232,16 +272,6 @@ class TPPPlotterGUI(QWidget):
             self.worker.finished.connect(self.thread.quit)
             self.worker.finished.connect(self.worker.deleteLater)
             self.thread.finished.connect(self.thread.deleteLater)
-
-            """
-            # Optional: Log success via existing handler (will show in status box live)
-            self.worker.finished.connect(lambda: logging.info("Processing complete! All done."), Qt.QueuedConnection)
-            self.worker.error.connect(lambda msg: logging.error(f"Error during processing: {msg}"), Qt.QueuedConnection)
-
-            # Re-enable button on finish/error
-            self.worker.finished.connect(lambda: self.run_button.setEnabled(True), Qt.QueuedConnection)
-            self.worker.error.connect(lambda: self.run_button.setEnabled(True), Qt.QueuedConnection)
-            """
 
             # Start the thread
             self.thread.start()

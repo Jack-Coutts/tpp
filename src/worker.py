@@ -18,6 +18,7 @@ class Worker(QObject):
         data_file,
         output_folder,
         error_bars,
+        line_names,
         mode,
         gene_name=None,
         gene_list_file=None,
@@ -27,6 +28,7 @@ class Worker(QObject):
         self.data_file = data_file
         self.output_folder = output_folder
         self.error_bars = error_bars
+        self.line_names = line_names
         self.mode = mode
         self.gene_name = gene_name
         self.gene_list_file = gene_list_file

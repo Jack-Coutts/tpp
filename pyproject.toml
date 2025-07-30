@@ -2,7 +2,7 @@
 name = "thermal-proteome-profiling"
 version = "0.1.0"
 description = ""
-authors = [{ name = "Jack Coutts"}]
+authors = [{ name = "Jack Coutts" }]
 requires-python = "~=3.12.0"
 readme = "README.md"
 dependencies = [
@@ -18,3 +18,6 @@ dependencies = [
 [build-system]
 build-backend = "hatchling.build"
 requires = ["hatchling>=1,<2"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]

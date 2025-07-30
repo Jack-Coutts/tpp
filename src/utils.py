@@ -181,6 +181,7 @@ def filter_or_plot_gene(
     gene_name,
     data_df,
     output_dir,
+    cell_line,
     highest_y_value,
     lowest_y_value,
     filter=False,
@@ -198,9 +199,6 @@ def filter_or_plot_gene(
     # cell line name
     cell_line = gene_data["Comparison (group1/group2)"].iloc[0].split("_")[0]
 
-    # protein variants
-    variants = gene_data["Comparison (group1/group2)"].str.split("_").str[1].unique()
-
     # concentrations
     concentrations = (
         gene_data["Comparison (group1/group2)"]
@@ -210,12 +208,17 @@ def filter_or_plot_gene(
         .str[0]  # get the part before the first space
         .unique()  # get unique values
     )
-
     sorted_concentrations = sorted(concentrations, key=lambda x: float(x.rstrip("uM")))
+
+    variants = gene_data["Comparison (group1/group2)"].str.split("_").str[1].unique()
 
     # Create line df
     plot_df, lines = get_lines(
-        variants, gene_data, sorted_concentrations, "AVG Log2 Ratio", "log_fld_change"
+        variants,
+        gene_data,
+        sorted_concentrations,
+        "AVG Log2 Ratio",
+        "log_fld_change",
     )
 
     error_df = None
