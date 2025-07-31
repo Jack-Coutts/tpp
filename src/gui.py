@@ -58,13 +58,11 @@ class TPPPlotterGUI(QWidget):
         self.mode_group = QButtonGroup(self)
         self.mode_gene = QRadioButton("Plot Single Gene")
         self.mode_gene_list = QRadioButton("Plot from Gene List")
-        self.mode_filter = QRadioButton("Filter Proteins")
         self.mode_all = QRadioButton("Plot All Proteins")
         self.mode_gene.setChecked(True)
 
         self.mode_group.addButton(self.mode_gene)
         self.mode_group.addButton(self.mode_gene_list)
-        self.mode_group.addButton(self.mode_filter)
         self.mode_group.addButton(self.mode_all)
 
         self.gene_label = QLabel("Gene Name:")
@@ -127,7 +125,6 @@ class TPPPlotterGUI(QWidget):
         mode_layout = QVBoxLayout()
         mode_layout.addWidget(self.mode_gene)
         mode_layout.addWidget(self.mode_gene_list)
-        mode_layout.addWidget(self.mode_filter)
         mode_layout.addWidget(self.mode_all)
         main_layout.addLayout(mode_layout)
 
@@ -173,7 +170,6 @@ class TPPPlotterGUI(QWidget):
         self.run_button.clicked.connect(self.on_run)
         self.mode_gene.toggled.connect(self.update_mode_inputs)
         self.mode_gene_list.toggled.connect(self.update_mode_inputs)
-        self.mode_filter.toggled.connect(self.update_mode_inputs)
         self.mode_all.toggled.connect(self.update_mode_inputs)
         self.single_line.toggled.connect(self.update_line_num_inputs)
         self.two_lines.toggled.connect(self.update_line_num_inputs)
