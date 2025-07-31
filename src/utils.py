@@ -275,7 +275,9 @@ def plot_gene(
     )
 
 
-def filter_proteins(line_dictionary, concentrations, variants, threshold=2, flat=False):
+def filter_area_between_curves(
+    line_dictionary, concentrations, variants, threshold=2, flat=False
+):
     # NOTE: Concentrations are treated as categorical data to equally weight each concentration change
     logging.info("filtering started")
     logging.info(f"Area between curves threshold: {threshold}")
@@ -307,3 +309,11 @@ def filter_proteins(line_dictionary, concentrations, variants, threshold=2, flat
         if area > threshold:
             return True
         return False
+
+
+def filter_for_flatness():
+    pass
+
+
+def filter_against_flatness():
+    pass
