@@ -58,25 +58,27 @@ def read_data(path: Path) -> Tuple[pd.DataFrame, float, float]:
         logging.error(f"{e}")
 
 
-def get_variants(df: pd.DataFrame, single_mode: bool) -> List[str] | NoReturn:
+def get_variants(
+    df: pd.DataFrame, single_mode: bool, line_name: str
+) -> List[str] | NoReturn:
     variants = list(df["Comparison (group1/group2)"].str.split("_").str[1].unique())
 
-    if single_mode and len(variants) == 1:
-        logging.info(f"one variant found successfuly: {variants[0]}")
-        return variants
-    elif single_mode and len(variants) < 1:
-        logging.error("check comparison naming, no variants found")
-        raise AssertionError("No variants found in data")
-    elif single_mode is False and len(variants) == 2:
-        logging.info(f"two variants found successfully: {variants}")
-        return variants
-    elif single_mode is False and len(variants) != 2:
-        var_num = len(variants)
-        logging.error(f"check comparison naming, {var_num} variants found")
-        raise AssertionError("Incorrect number of variants found in data")
+    if single_mode:
+        if line_name in variants:
+            single_variant = [line_name]
+            logging.info(f"one variant found successfuly: {line_name}")
+            return single_variant
+        else:
+            logging.error(f"'{line_name}' not found in {variants}")
+            raise AssertionError("Variant not found in data")
     else:
-        logging.error("incorrect number of variants")
-        raise RuntimeError("Error getting variants")
+        if len(variants) == 2:
+            logging.info(f"two variants found successfully: {variants}")
+            return variants
+        else:
+            var_num = len(variants)
+            logging.error(f"{var_num} variants found but only two were expected")
+            raise AssertionError("Incorrect number of variants found in data")
 
 
 def plotter(
@@ -94,29 +96,43 @@ def plotter(
         plt.rcParams["font.size"] = 11
 
         # ensure line colour consistency
-        try:
-            sorted_variants = sorted(variants, key=lambda x: x[0])
-            variant_palette = {
-                sorted_variants[0]: "#1f77b4",
-                sorted_variants[1]: "#d62728",
-            }
-        except Exception as e:
-            logging.error(
-                f"Less than 2 protein varainats exist: Variants: {variants}\n Error: {e}"
-            )
-            return
+        if len(variants) > 1:
+            try:
+                sorted_variants = sorted(variants, key=lambda x: x[0])
+                variant_palette = {
+                    sorted_variants[0]: "#1f77b4",
+                    sorted_variants[1]: "#d62728",
+                }
+                sns.lineplot(
+                    data=df,
+                    x="concentration",  # categorical, equally spaced
+                    y="log_fld_change",
+                    hue="variant",  # separate lines per variant
+                    palette=variant_palette,
+                    hue_order=[sorted_variants[0], sorted_variants[1]],
+                    marker="o",
+                    linewidth=2,
+                    markersize=6,
+                )
+            except Exception as e:
+                logging.error(
+                    f"Less than 2 protein variants exist: Variants: {variants}\n Error: {e}"
+                )
+                return
+        else:
+            sorted_variants = variants
+            variant_palette = {sorted_variants[0]: "#d62728"}
 
-        sns.lineplot(
-            data=df,
-            x="concentration",  # categorical, equally spaced
-            y="log_fld_change",
-            hue="variant",  # separate lines per variant
-            palette=variant_palette,
-            hue_order=[sorted_variants[0], sorted_variants[1]],
-            marker="o",
-            linewidth=2,
-            markersize=6,
-        )
+            sns.lineplot(
+                data=df,
+                x="concentration",  # categorical, equally spaced
+                y="log_fld_change",
+                hue="variant",  # separate lines per variant
+                palette=variant_palette,
+                marker="o",
+                linewidth=2,
+                markersize=6,
+            )
 
         # Add error bars if error_df is provided
         if error_df is not None:

@@ -46,10 +46,13 @@ class TPPPlotterGUI(QWidget):
         self.multi_line = QButtonGroup(self)
         self.single_line = QRadioButton("Plot One Line")
         self.two_lines = QRadioButton("Plot Two Lines")
-        self.two_lines.setChecked(True)
+        self.single_line.setChecked(True)
 
         self.multi_line.addButton(self.single_line)
         self.multi_line.addButton(self.two_lines)
+
+        self.line_name_label = QLabel("Compound Name:")
+        self.name_of_line = QLineEdit()
 
         # Radio buttons for modes
         self.mode_group = QButtonGroup(self)
@@ -105,6 +108,12 @@ class TPPPlotterGUI(QWidget):
         multi_line.addWidget(self.single_line)
         multi_line.addWidget(self.two_lines)
         main_layout.addLayout(multi_line)
+
+        # single line name
+        line_name = QHBoxLayout()
+        line_name.addWidget(self.line_name_label)
+        line_name.addWidget(self.name_of_line)
+        main_layout.addLayout(line_name)
 
         # horizonatal divider
         divider = QFrame()
@@ -166,6 +175,9 @@ class TPPPlotterGUI(QWidget):
         self.mode_gene_list.toggled.connect(self.update_mode_inputs)
         self.mode_filter.toggled.connect(self.update_mode_inputs)
         self.mode_all.toggled.connect(self.update_mode_inputs)
+        self.single_line.toggled.connect(self.update_line_num_inputs)
+        self.two_lines.toggled.connect(self.update_line_num_inputs)
+
         self.stop_button.clicked.connect(self.on_stop)
 
         self.update_mode_inputs()
@@ -220,6 +232,11 @@ class TPPPlotterGUI(QWidget):
         self.gene_list_path.setEnabled(self.mode_gene_list.isChecked())
         self.gene_list_browse.setEnabled(self.mode_gene_list.isChecked())
 
+    def update_line_num_inputs(self):
+        # Show/hide input widgets based on selected line num
+        self.line_name_label.setEnabled(self.single_line.isChecked())
+        self.line.setEnabled(self.single_line.isChecked())
+
     def reset_ui(self):
         self.run_button.setEnabled(True)
         self.stop_button.setEnabled(False)
@@ -255,9 +272,13 @@ class TPPPlotterGUI(QWidget):
             output_folder = check_directory(output_folder_str)
 
             # different logic for plotting a single line or two lines
-            single_mode = True
-            if self.two_lines.isChecked():
-                single_mode = False
+            single_mode = False
+            line_name = ""
+            if self.single_line.isChecked():
+                single_mode = True
+                line_name = self.name_of_line.text()
+                print(line_name)
+            print(line_name)
 
             mode = None
             gene_name = None
@@ -291,9 +312,11 @@ class TPPPlotterGUI(QWidget):
                 single_mode,
                 error_bars,
                 mode,
+                line_name,
                 gene_name,
                 gene_list_file,
             )
+
             self.worker.moveToThread(self.thread)
 
             # Connect signals

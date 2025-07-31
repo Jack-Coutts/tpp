@@ -17,6 +17,7 @@ class Worker(QObject):
         single_mode,
         error_bars,
         mode,
+        line_name,
         gene_name=None,
         gene_list_file=None,
         parent=None,
@@ -29,6 +30,7 @@ class Worker(QObject):
         self.mode = mode
         self.gene_name = gene_name
         self.gene_list_file = gene_list_file
+        self.line_name = line_name
         self._stop_requested = False  # Flag for interruption
 
     def request_stop(self):
@@ -41,7 +43,8 @@ class Worker(QObject):
             data_df, y_max, y_min = read_data(self.data_file)
 
             # the the compound variants (line names)
-            variants = get_variants(data_df, self.single_mode)
+            print(self.line_name)
+            variants = get_variants(data_df, self.single_mode, self.line_name)
 
             if self.mode == "gene":
                 if self._stop_requested:
