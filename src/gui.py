@@ -25,6 +25,8 @@ from .worker import Worker
 class TPPPlotterGUI(QWidget):
     def __init__(self):
         super().__init__()
+        self.worker = None
+        self.thread = None
         self.setWindowTitle("TPP Plotter")
         self.setMinimumSize(800, 600)
         self.init_ui()
@@ -232,7 +234,9 @@ class TPPPlotterGUI(QWidget):
             )  # Disable immediately to prevent multiple clicks
 
     def on_run(self):
-        self.reset_ui()
+        if self.thread and self.thread.isRunning():
+            logging.warning("A process is already running. Please wait or stop it.")
+            return
         try:
             data_file_str = self.data_path.text()
             output_folder_str = self.output_path.text()
@@ -297,32 +301,38 @@ class TPPPlotterGUI(QWidget):
             self.worker.finished.connect(self.thread.quit)
             self.worker.finished.connect(self.worker.deleteLater)
 
-            # Connect worker signals to UI reset
-            self.worker.finished.connect(self.reset_ui)
-            self.worker.error.connect(self.reset_ui)
-            self.worker.stopped.connect(self.reset_ui)
-
             # Connect thread.finished to safe cleanup
-            self.thread.finished.connect(self.on_thread_finished)
+            self.thread.finished.connect(self._on_cleanup_finished)
 
             # Start the thread
             self.thread.start()
 
+            # update ui state
             self.run_button.setEnabled(False)
             self.stop_button.setEnabled(True)
 
         except Exception as e:
             logging.error(f"Error starting worker: {e}")
             self.reset_ui()
+            # Ensure stale references are cleared on setup error
+            self.thread = None
+            self.worker = None
 
     # safe cleanup method
     @Slot()
-    def on_thread_finished(self):
-        if self.thread.isRunning():
-            if not self.thread.wait(5000):  # Wait up to 5 seconds; adjust as needed
-                logging.warning("Thread did not finish in time - forcing quit")
-                self.thread.quit()
-                self.thread.wait()  # Wait again after force quit
-        self.thread.deleteLater()  # Now safe to delete
-        self.stop_button.setEnabled(False)  # Ensure Stop is disabled
-        self.reset_ui()  # Final reset
+    def _on_cleanup_finished(self):
+        """
+        This slot runs only after the thread has completely finished.
+        It's the safest place to reset the UI and clear references.
+        """
+        logging.info("Thread finished, performing final cleanup.")
+        if self.thread:  # Check if the object still exists before deleting
+            # thread deleted when current tasks are finished
+            self.thread.deleteLater()
+
+        # Nullify references to ensure a clean state for the next run
+        self.thread = None
+        self.worker = None
+
+        # Now it's safe to reset the UI
+        self.reset_ui()

@@ -114,3 +114,10 @@ class Worker(QObject):
         except Exception as e:
             logging.error(f"Error in worker: {e}")
             self.error.emit(str(e))
+
+        finally:
+            # THIS IS THE MOST IMPORTANT PART
+            # This will run no matter how the 'try' block exits.
+            # It allows the user to run proccessing again as the thread is closed
+            logging.info("Worker's run method finished, emitting 'finished' signal.")
+            self.finished.emit()
