@@ -1,4 +1,6 @@
 import logging
+from pathlib import Path
+from typing import Optional
 
 from PySide6.QtCore import QObject, Signal, Slot
 
@@ -12,16 +14,16 @@ class Worker(QObject):
 
     def __init__(
         self,
-        data_file,
-        output_folder,
-        single_mode,
-        error_bars,
-        mode,
-        line_name,
-        gene_name=None,
-        gene_list_file=None,
-        parent=None,
-    ):
+        data_file: Path,
+        output_folder: Path,
+        single_mode: bool,
+        error_bars: bool,
+        mode: str,
+        line_name: str,
+        gene_name: Optional[str] = None,
+        gene_list_file: Optional[Path] = None,
+        parent: Optional[QObject] = None,
+    ) -> None:
         super().__init__(parent)
         self.data_file = data_file
         self.output_folder = output_folder
@@ -33,17 +35,16 @@ class Worker(QObject):
         self.line_name = line_name
         self._stop_requested = False  # Flag for interruption
 
-    def request_stop(self):
+    def request_stop(self) -> None:
         self._stop_requested = True
 
     @Slot()
-    def run(self):
+    def run(self) -> None:
         try:
             logging.info(f"Loading data from {self.data_file}")
             data_df, y_max, y_min = read_data(self.data_file)
 
-            # the the compound variants (line names)
-            print(self.line_name)
+            # Get the compound variants (line names)
             variants = get_variants(data_df, self.single_mode, self.line_name)
 
             if self.mode == "gene":
@@ -55,8 +56,8 @@ class Worker(QObject):
                 plot_gene(
                     self.gene_name,
                     data_df,
-                    variants,
                     self.output_folder,
+                    variants,
                     y_max,
                     y_min,
                     error_bars=self.error_bars,
@@ -113,14 +114,23 @@ class Worker(QObject):
                     )
 
             logging.info("Processing complete.")
-            self.finished.emit()
+        except FileNotFoundError as e:
+            error_msg = f"File not found: {e}"
+            logging.error(error_msg)
+            self.error.emit(error_msg)
+        except PermissionError as e:
+            error_msg = f"Permission denied: {e}"
+            logging.error(error_msg)
+            self.error.emit(error_msg)
+        except ValueError as e:
+            error_msg = f"Data validation error: {e}"
+            logging.error(error_msg)
+            self.error.emit(error_msg)
         except Exception as e:
-            logging.error(f"Error in worker: {e}")
-            self.error.emit(str(e))
-
+            error_msg = f"Unexpected error in worker: {e}"
+            logging.error(error_msg)
+            self.error.emit(error_msg)
         finally:
-            # THIS IS THE MOST IMPORTANT PART
-            # This will run no matter how the 'try' block exits.
-            # It allows the user to run proccessing again as the thread is closed
+            # Ensure finished signal is always emitted for proper cleanup
             logging.info("Worker's run method finished, emitting 'finished' signal.")
             self.finished.emit()
