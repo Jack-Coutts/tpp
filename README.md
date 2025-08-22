@@ -1,5 +1,22 @@
 # TPP Plotter - Thermal Proteome Profiling Analysis Tool
 
+## Download Ready-to-Use Application
+
+**For End Users (No Python Required):**
+
+**Windows:** Download `TPP-Plotter-Windows.zip` from [Releases](../../releases)
+- Extract the zip file
+- Double-click `TPP Plotter.exe` to run
+
+**macOS:** Download `TPP-Plotter-macOS.zip` from [Releases](../../releases)
+- Extract the zip file
+- Drag `TPP Plotter.app` to your Applications folder
+- Double-click to run (you may need to right-click → Open the first time)
+
+Both versions include all dependencies and provide a complete GUI experience.
+
+---
+
 ## Overview
 
 TPP Plotter is a desktop application for analyzing thermal proteome profiling (TPP) data. TPP is a systems-wide method to study protein thermal stability and drug-protein interactions by analyzing protein aggregation at different temperatures and compound concentrations.
@@ -229,7 +246,7 @@ python build_mac.py
 ```
 **Output:** `dist/TPP Plotter.app` - Users can drag this to their Applications folder and double-click to run.
 
-#### For Windows  
+#### For Windows
 ```bash
 python build_windows.py
 ```
