@@ -8,3 +8,4 @@ outputs/*
 build/
 main.spec
 dist/
+*.spec

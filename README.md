@@ -213,3 +213,35 @@ uv run python src/main.py -d data/file.tsv -o outputs/ -f
 # With error bars
 uv run python src/main.py -d data/file.tsv -o outputs/ -e
 ```
+
+## Creating Standalone Executables
+
+For non-technical end users, you can create standalone executables that don't require Python installation.
+
+### Prerequisites
+- PyInstaller: `uv add pyinstaller --dev`
+
+### Building Executables
+
+#### For macOS
+```bash
+python build_mac.py
+```
+**Output:** `dist/TPP Plotter.app` - Users can drag this to their Applications folder and double-click to run.
+
+#### For Windows  
+```bash
+python build_windows.py
+```
+**Output:** `dist/TPP Plotter.exe` - Users can double-click this file to run the application.
+
+### Distribution
+- **macOS:** Share the entire `TPP Plotter.app` bundle
+- **Windows:** Share the single `TPP Plotter.exe` file
+- Both versions include all dependencies and don't show a console window
+
+### Cleanup (Optional)
+You can remove development files before distribution:
+- `build/` directory (build artifacts)
+- `*.spec` files (PyInstaller configuration)
+- Keep `dist/` for the final executables

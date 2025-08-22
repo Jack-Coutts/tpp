@@ -21,3 +21,8 @@ requires = ["hatchling>=1,<2"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.15.0",
+]
