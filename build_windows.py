@@ -13,6 +13,8 @@ def build_windows():
     print("Building TPP Plotter for Windows...")
 
     args = [
+        "uv",
+        "run",
         "pyinstaller",
         "--noconsole",  # No console window
         "--onefile",  # Single executable file
