@@ -68,46 +68,11 @@ QTextEdit {
     font-size: 9pt;
 }
 
-/* Checkbox Styling - Fixed for Windows */
+/* Checkbox Styling - Minimal for Windows compatibility */
+/* Let Windows handle the checkbox rendering natively */
 QCheckBox {
     spacing: 8px;
     color: #495057;
-}
-
-QCheckBox::indicator {
-    width: 18px;
-    height: 18px;
-    border: 2px solid #ced4da;
-    border-radius: 3px;
-    background-color: white;
-}
-
-QCheckBox::indicator:hover {
-    border-color: #007bff;
-    background-color: #e6f2ff;
-}
-
-QCheckBox::indicator:checked {
-    background-color: #007bff;
-    border-color: #0056b3;
-}
-
-/* Checkmark drawing for Windows compatibility */
-QCheckBox::indicator:checked {
-    background-color: #007bff;
-    border-color: #0056b3;
-    /* Draw checkmark with gradients - works on Windows */
-    background-image: 
-        linear-gradient(45deg, transparent 65%, white 65%, white 75%, transparent 75%),
-        linear-gradient(-45deg, transparent 35%, white 35%, white 45%, transparent 45%);
-    background-position: 5px 2px, 3px 5px;
-    background-size: 7px 10px, 10px 7px;
-    background-repeat: no-repeat;
-}
-
-QCheckBox::indicator:disabled {
-    background-color: #e9ecef;
-    border-color: #dee2e6;
 }
 
 /* Radio Button Styling */
