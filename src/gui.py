@@ -694,86 +694,37 @@ class TPPPlotterGUI(QWidget):
     def _apply_ui_styling(self) -> None:
         """Apply consistent styling across the UI components.
         
+        Loads styles from external QSS file for better maintainability.
         Sets up professional styling including:
         - Button styling with hover effects
         - Consistent color scheme
         - Improved spacing and padding
+        - Windows-compatible checkbox indicators
         """
         try:
-            # Main application styling
-            self.setStyleSheet("""
-                QWidget {
-                    background-color: #f8f9fa;
-                    color: #343a40;
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                }
-                
-                QPushButton {
-                    background-color: #007bff;
-                    color: white;
-                    border: none;
-                    padding: 8px 16px;
-                    border-radius: 4px;
-                    font-weight: bold;
-                    min-width: 80px;
-                }
-                
-                QPushButton:hover {
-                    background-color: #0056b3;
-                }
-                
-                QPushButton:pressed {
-                    background-color: #004085;
-                }
-                
-                QPushButton:disabled {
-                    background-color: #6c757d;
-                    color: #adb5bd;
-                }
-                
-                QLineEdit {
-                    border: 2px solid #ced4da;
-                    border-radius: 4px;
-                    padding: 5px;
-                    background-color: white;
-                }
-                
-                QLineEdit:focus {
-                    border-color: #007bff;
-                }
-                
-                QComboBox, QSpinBox, QDoubleSpinBox {
-                    border: 2px solid #ced4da;
-                    border-radius: 4px;
-                    padding: 5px;
-                    background-color: white;
-                    min-width: 100px;
-                }
-                
-                QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {
-                    border-color: #007bff;
-                }
-                
-                QTextEdit {
-                    border: 2px solid #ced4da;
-                    border-radius: 4px;
-                    background-color: white;
-                    font-family: 'Consolas', 'Monaco', monospace;
-                    font-size: 9pt;
-                }
-                
-                QCheckBox {
-                    spacing: 8px;
-                }
-                
-                QRadioButton {
-                    spacing: 8px;
-                }
-                
-                QLabel {
-                    color: #495057;
-                }
-            """)
+            # Load styles from external QSS file
+            qss_path = Path(__file__).parent / "styles.qss"
+            
+            if qss_path.exists():
+                with open(qss_path, 'r') as f:
+                    stylesheet = f.read()
+                    self.setStyleSheet(stylesheet)
+                    logging.info(f"Loaded styles from {qss_path}")
+            else:
+                # Fallback to basic styling if QSS file not found
+                logging.warning(f"Style sheet not found at {qss_path}, using basic styling")
+                self.setStyleSheet("""
+                    QWidget {
+                        background-color: #f8f9fa;
+                        color: #343a40;
+                    }
+                    QPushButton {
+                        background-color: #007bff;
+                        color: white;
+                        padding: 8px;
+                        border-radius: 4px;
+                    }
+                """)
             
         except Exception as e:
             logging.error(f"Error applying UI styling: {e}")
