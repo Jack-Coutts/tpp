@@ -702,11 +702,23 @@ class TPPPlotterGUI(QWidget):
         - Windows-compatible checkbox indicators
         """
         try:
-            # Load styles from external QSS file
-            qss_path = Path(__file__).parent / "styles.qss"
+            import sys
+            import os
+            
+            # Determine if we're running as a bundled executable
+            if getattr(sys, 'frozen', False):
+                # Running as bundled executable (PyInstaller)
+                # sys._MEIPASS is the temp folder where PyInstaller extracts files
+                bundle_dir = Path(sys._MEIPASS)
+            else:
+                # Running in normal Python environment
+                bundle_dir = Path(__file__).parent
+            
+            # Try to load the QSS file
+            qss_path = bundle_dir / "styles.qss"
             
             if qss_path.exists():
-                with open(qss_path, 'r') as f:
+                with open(qss_path, 'r', encoding='utf-8') as f:
                     stylesheet = f.read()
                     self.setStyleSheet(stylesheet)
                     logging.info(f"Loaded styles from {qss_path}")

@@ -19,6 +19,7 @@ def build_mac():
         "--noconsole",  # No console window, creates .app bundle
         "--onedir",  # Directory bundle (recommended for macOS)
         "--name=TPP Plotter",
+        "--add-data=src/styles.qss:.",  # Include QSS file (macOS/Linux uses : as separator)
         "src/main.py",
     ]
 

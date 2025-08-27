@@ -19,6 +19,7 @@ def build_windows():
         "--noconsole",  # No console window
         "--onefile",  # Single executable file
         "--name=TPP Plotter",
+        "--add-data=src/styles.qss;.",  # Include QSS file (Windows uses ; as separator)
         "src/main.py",
     ]
 
